@@ -7,3 +7,9 @@ Hi, my name is Ivan Wu, a third-year in Course 6-3 at MIT. I enjoy thinking abou
 ### Q&A 
 
 Paste your questions below: 
+
+
+## Hunnaid Husain
+I'm Hunnaid, junior studying 6-3. I enjoy experimenting with new recipes and working on cool projects.
+
+### Q&A
