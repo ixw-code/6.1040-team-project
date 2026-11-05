@@ -1,15 +1,23 @@
 # Our Team
 
-## Ivan 
+## Ivan
 
 Hi, my name is Ivan Wu, a third-year in Course 6-3 at MIT. I enjoy thinking about design for software systems like those behind video games, web applications, and scalable database applications in general. Outside of software, I'm an avid enjoyer of fantasy novels and I'm currently doing gymnastics at MIT, as I also enjoy working out. It's nice to meet you!
 
-### Q&A 
+### Q&A
 
-Paste your questions below: 
-
+What are some fantasy novels you like?
 
 ## Hunnaid Husain
+
 I'm Hunnaid, junior studying 6-3. I enjoy experimenting with new recipes and working on cool projects.
 
 ### Q&A
+
+What's a project you've worked on that you are proud of or enjoyed?
+
+## Rowan
+
+I'm Rowan Dzwonkowski (rld), a senior studying 6-3. After graduation, I hope to work in software for healthcare. My recent pasttimes outside of school include ArtRPGs and watching Adventure Time, and I also like wandering around Cambridge and Boston.
+
+## Q&A
