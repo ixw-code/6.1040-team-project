@@ -21,3 +21,9 @@ What's a project you've worked on that you are proud of or enjoyed?
 I'm Rowan Dzwonkowski (rld), a senior studying 6-3. After graduation, I hope to work in software for healthcare. My recent pasttimes outside of school include ArtRPGs and watching Adventure Time, and I also like wandering around Cambridge and Boston.
 
 ## Q&A
+
+Are there particular subdomains of healthcare that you would like to work in?
+
+## Ada Tsui
+
+Hi! My name is Ada Tsui, a junior in 6-3 and 18 at MIT. I enjoy thinking about how to integrate AI in my processes (wordflows) and products. I like to read (recently read and loved East of Eden!), and explore and eat in Cambridge and Boston.
