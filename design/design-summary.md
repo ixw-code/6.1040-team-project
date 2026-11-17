@@ -2,7 +2,7 @@
 
 The overall design of *Shift Happens* is visualized in the below concept map, where concepts and compositions connect to *Shift Happens* in the center. Prose explanations follow.
 
-![[concept-map.png]]
+!(concept map)[concept-map.png]
 
 ## Core features 
 
