@@ -21,17 +21,17 @@ enum Status is PENDING or COMPLETED
 ```state 
 a set of Tasks with 
   an item Item
-  an assignee Person 
+  an optional assignee Person 
   a status Status
   a deadline DateTime
 ```
 
 ## Actions 
 ```actions 
-add(item: Item, assignee: Person, deadline: DateTime) : returns (task: Task) 
+add(item: Item, deadline: DateTime) : returns (task: Task) 
   where true 
   then 
-    creates a new task with the item assigned to the assignee, a status of PENDING, and a set deadline 
+    creates a new task with the item, an assignee of None, a status of PENDING, and a set deadline 
     returns the task 
 
 assign(task: Task, assignee: Person) : returns (task: Task)
@@ -41,6 +41,15 @@ assign(task: Task, assignee: Person) : returns (task: Task)
   where task exists 
   then
     update the task's assignment to the new assignee
+    returns the task 
+
+unassign(task: Task) : returns (task: Task)
+  where task doesn't exist 
+  then 
+    refuse TASK_DOESNT_EXIST "Task doesn't exist." 
+  where task exists 
+  then
+    update the task's assignment to None
     returns the task 
 
 setDeadline(task: Task, deadline: DateTime) : returns (task : Task)
