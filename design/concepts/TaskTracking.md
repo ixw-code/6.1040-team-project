@@ -97,8 +97,8 @@ remove(task: Task) : returns (task : Task)
 
 ## Queries
 ```queries
-_tasks() : many (item: Item, assignee: Person, status: Status, deadline: DateTime) 
-  Returns all the tasks.
+_tasks(person: Person) : many (item: Item, status: Status, deadline: DateTime) 
+  Returns all the tasks assigned to a person.
 
 _pending() : many (item: Item, assignee: Person, status: Status, deadline: DateTime) 
   Returns all the tasks currently pending. 
