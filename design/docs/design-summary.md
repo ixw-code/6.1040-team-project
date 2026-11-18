@@ -2,9 +2,9 @@
 
 The overall design of *Shift Happens* is visualized in the below concept map, where concepts and compositions connect to *Shift Happens* in the center. Prose explanations follow.
 
-![Concept Map](concept-map.png)
+![Concept Map](attachments/concept-map.png)
 
-## Core features 
+## Core features
 
 The problem of **unclear assignments** and **uneven responsibilities** are addressed through the `ChoreAssignments` composition. Chores are populated into the `ChoreCataloguing` concept by the Overseer, along with how frequently they need to be done and the overseer's assessment of how preferred that chore is at large. Users' availabilities and chore preferences, along with the overall list of chores from `ChoreCataloguing`, are used by `Scheduling` in order to determine a satisfactory distribution of chores for the household. The option for users to submit their own chore preferences helps them get a chore that is less taxing for them, but if they do not submit preferences, the defaults set by the Overseer will be used. `ChoreCataloguing` and `Scheduling` will split a chore into specific tasks, stored by `TaskTracking`, that have a data and can be completed.
 
