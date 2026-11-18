@@ -29,11 +29,32 @@ continue with:
 bun run dev
 ```
 
-This starts MongoDB, waits for an authenticated read/write check, and starts the
-backend skeleton in watch mode at <http://127.0.0.1:3000>. Its `/health` route
-returns HTTP 200 when MongoDB responds and 503 when it is unavailable. There are
-no application endpoints or frontend yet. `HOST` and `PORT` can override the
-backend address.
+This starts MongoDB, waits for an authenticated read/write check, and starts both
+the backend and Vue frontend in watch mode. Open <http://localhost:5173>.
 
-Ctrl+C stops the backend. MongoDB remains running so local data stays available.
+The backend runs at <http://127.0.0.1:3000>. Its `/health` route returns HTTP 200
+when MongoDB responds and 503 when it is unavailable. Vite forwards `/api` and
+`/health` requests from the frontend to that backend, so browser requests can use
+relative URLs. If you override the backend's `HOST` or `PORT`, update the proxy
+targets in `web/vite.config.ts` as well.
 
+Ctrl+C stops both development servers. MongoDB remains running so local data
+stays available.
+
+## Run services separately
+
+Start MongoDB:
+
+```sh
+bun run db:up
+```
+
+Then run the backend and frontend in separate terminals from the repository root:
+
+```sh
+bun run dev:backend
+```
+
+```sh
+bun run dev:frontend
+```
