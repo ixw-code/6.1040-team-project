@@ -14,6 +14,8 @@ Alice reads the feedback, finishes the work, and submits another photo. The earl
 
 Sam chooses automatic review. If the automated reviewer can approve his submission, it records approval. Otherwise, the submission moves to manual review and remains pending until a human approves or rejects it.
 
+In Shift Happens, each subject is a specific task occurrence. The composition supplies the completion criteria validated when the chore was created.
+
 ## Types
 
 ```types
@@ -29,14 +31,9 @@ external Photo
 external Reviewer
   The person or automated reviewer making a decision.
 
-enum ReviewMethod
-  manual
-  automatic
+ReviewMethod is MANUAL or AUTOMATIC
 
-enum Status
-  pending
-  approved
-  rejected
+Status is PENDING or APPROVED or REJECTED
 ```
 
 ## State
@@ -56,7 +53,7 @@ a set of Submissions with
   an optional reviewedAt DateTime
   a feedback String
 
-each Subject has at most one current Submission
+Rule: each Subject has at most one current Submission.
 
 Rule: a new submission starts pending with empty feedback, no reviewer, and no review time.
 
@@ -74,15 +71,7 @@ Rule: a submission's person, subject, photo, criteria, baseline, selectedMethod,
 ## Actions
 
 ```actions
-submit(
-    person: Person,
-    subject: Subject,
-    photo: Photo,
-    criteria: String,
-    baseline: Photo,
-    method: ReviewMethod
-) : returns (submission: Submission)
-
+submit(person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, method: ReviewMethod) : returns (submission: Submission)
     where the subject's current submission is pending
     then
       refuses ALREADY_PENDING "This subject already has a pending submission."
@@ -91,8 +80,7 @@ submit(
     then
       refuses ALREADY_APPROVED "This subject already has an approved submission."
 
-    where the subject has no current submission,
-            or its current submission is rejected
+    where the subject has no current submission or its current submission is rejected
     then
       add a new submission with person, subject, photo, criteria,
         baseline, selectedMethod method, reviewMethod method,
@@ -101,13 +89,7 @@ submit(
       preserve earlier submissions
       returns submission
 
-approve(
-  submission: Submission,
-  reviewer: Reviewer,
-  method: ReviewMethod,
-  feedback: String
-) : returns (submission: Submission, subject: Subject, person: Person)
-
+approve(submission: Submission, reviewer: Reviewer, method: ReviewMethod, feedback: String) : returns (submission: Submission, subject: Subject, person: Person)
   where submission does not exist
   then
     refuses NOT_FOUND "This submission does not exist."
@@ -126,14 +108,9 @@ approve(
     set its reviewer to reviewer
     set its reviewedAt to now
     set its feedback to feedback
-    returns submission, its subject, its person
+    returns submission, subject, person
 
-reject(
-  submission: Submission,
-  reviewer: Reviewer,
-  reason: String
-) : returns (submission: Submission, subject: Subject, person: Person)
-
+reject(submission: Submission, reviewer: Reviewer, reason: String) : returns (submission: Submission, subject: Subject, person: Person)
   where submission does not exist
   then
     refuses NOT_FOUND "This submission does not exist."
@@ -146,25 +123,20 @@ reject(
   then
     refuses MANUAL_REVIEW_REQUIRED "This submission must move to manual review before rejection."
 
-  where submission is pending and its reviewMethod is manual,
-    and reason is blank
+  where submission is pending and its reviewMethod is manual and reason is blank
   then
     refuses MISSING_REASON "Explain why the submission was rejected."
 
-  where submission is pending and its reviewMethod is manual,
-    and reason is not blank
+  where submission is pending and its reviewMethod is manual and reason is not blank
   then
     set its status to rejected
     set its reviewer to reviewer
     set its reviewedAt to now
     set its feedback to reason
-    returns submission, its subject, its person
+    returns submission, subject, person
 
 
-sendToOverseer(
-  submission: Submission
-) : returns (submission: Submission)
-
+sendToOverseer(submission: Submission) : returns (submission: Submission)
   where submission does not exist
   then
     refuses NOT_FOUND "This submission does not exist."
@@ -189,42 +161,13 @@ sendToOverseer(
 _current(subject: Subject) : optional (submission: Submission)
   Returns the subject's current submission, or no row if it has none.
 
-_submission(submission: Submission) : optional (
-  person: Person,
-  subject: Subject,
-  photo: Photo,
-  criteria: String,
-  baseline: Photo,
-  selectedMethod: ReviewMethod,
-  reviewMethod: ReviewMethod,
-  status: Status,
-  submittedAt: DateTime,
-  reviewer: Reviewer?,
-  reviewedAt: DateTime?,
-  feedback: String
-)
+_submission(submission: Submission) : optional (person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, selectedMethod: ReviewMethod, reviewMethod: ReviewMethod, status: Status, submittedAt: DateTime, reviewer?: Reviewer, reviewedAt?: DateTime, feedback: String)
   Returns the submission's evidence and review details, or no row if it does not exist.
 
-_history(subject: Subject) : set (
-  submission: Submission,
-  status: Status,
-  submittedAt: DateTime,
-  reviewedAt: DateTime?,
-  feedback: String
-)
-  Returns all submissions for the subject, including its current submission.
+_history(subject: Subject) : many (submission: Submission, status: Status, submittedAt: DateTime, reviewedAt?: DateTime, feedback: String)
+  Returns all submissions for the subject, newest attempt first, or no rows when there are none.
 
-_pending(method: ReviewMethod) : set (
-  submission: Submission,
-  subject: Subject,
-  person: Person,
-  submittedAt: DateTime
-)
-  Returns current pending submissions awaiting the given review method.
+_pending(method: ReviewMethod) : many (submission: Submission, subject: Subject, person: Person, submittedAt: DateTime)
+  Returns current pending submissions awaiting the given review method, oldest first.
+  Breaks timestamp ties by submission identifier. Returns no rows when none match.
 ```
-
-## Notes
-
-Subject identifies a specific task occurrence, such as Monday's sink cleaning assignment, rather than the recurring chore it self.
-
-Completion criteria are validated when the chore is created and supplied by the composition when a photo is submitted.
