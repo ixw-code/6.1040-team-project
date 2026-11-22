@@ -103,12 +103,20 @@ ChoreAssignments.GetTotals at /assignments/totals
 
 ## Notes
 
-Alpha supports joining, availability, creating tasks, weekly auto-scheduling balanced by weight with random tie-breaks, setting the schedule by hand, and reading the schedule. Beta adds preferences and swaps.
+Alpha supports joining, availability, creating tasks, weekly auto-scheduling balanced by weight with random tie-breaks, setting the schedule by hand, and reading the schedule. Beta adds preferences. Swaps are below.
 
 Household access and role checks belong in the composition. Scheduling uses generic groups and people and does not depend on household roles.
 
 This composition assumes that TaskTracking has `add`, `remove`, `assign`, and `unassign`, and that it can be asked whether a task is done. It also assumes that ChoreCataloguing exposes each chore's type, difficulty weight, and default preference weight. These names must be agreed on with Ivan.
 
-Swaps are beta. In alpha, residents who want to swap ask the Coordinator, who changes the schedule by hand. In beta, a small Trading concept records an offer from one resident and the other's acceptance, and this composition applies an accepted trade through `Scheduling.setSchedule` and `TaskTracking.assign`.
+Swaps use the Trading concept (`design/concepts/Trading.md`). A swap can give one or more tasks for one or more tasks. Concept actions can't take a list, so an offer is built as a draft: `propose` creates it, `addItem` adds each task to the OFFERED or REQUESTED side, and `send` opens it for an answer. Trading is implemented. The wiring below waits on Scheduling and TaskTracking being implemented, because it needs to look up who holds a single task:
+
+- **Offering a swap.** The endpoint takes the session plus a recipient and two lists of tasks. It calls `Trading.propose`, then `Trading.addItem` once per task, then `Trading.send`. Before `addItem`, it checks that the task is in the same household and not done, and that the proposer holds each OFFERED task and the recipient holds each REQUESTED task. A task may appear on both sides.
+- **Accepting.** The endpoint checks that the signed-in resident is the offer's recipient and the offer is pending (`Trading._offer`), and reads its tasks with `Trading._items`. It gives every OFFERED task to the recipient and every REQUESTED task to the proposer in one `Scheduling.setSchedule` call. That call refuses `NOT_AVAILABLE` if anyone is unavailable for a new task. Only after it succeeds does the endpoint call `Trading.accept`, then `TaskTracking.assign` for each task. Doing the schedule change first means a trade is never marked accepted unless the schedule changed. Accepting withdraws every other pending offer that shares any of its tasks.
+- **Declining and cancelling.** These call `Trading.decline` and `Trading.cancel` with the session's person. The concept refuses the wrong person. Cancelling works on drafts and pending offers.
+- **Keeping offers current.** When a task changes hands any other way (the Coordinator sets the schedule, availability is removed, the task is removed or completed), a reaction calls `Trading.withdraw` for that task. Drafts are left alone, because `send` rechecks who holds each task.
+- **Reading.** `Trading._incoming` and `Trading._outgoing` drive a resident's swap inbox, and `Trading._items` lists the tasks in each offer.
+
+Scheduling needs a query that returns one job's person (for example `_job(job)`) for these checks.
 
 The weekly run needs the coming week's tasks to exist first. Recurring chores (for example, "sink every Monday") could create tasks for each week automatically. Recurrence belongs in ChoreCataloguing or TaskTracking, not Scheduling. Until that is decided, the Coordinator creates each period's tasks.

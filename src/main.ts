@@ -2,7 +2,7 @@ import { createGateway } from "@mit-sdg/sync-engine/boundary";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { assembleApplication } from "./assembly.ts";
 import { policy } from "./http.ts";
-import { db } from "./db.ts";
+import { getDb } from "./db.ts";
 
 const application = assembleApplication();
 const gateway = createGateway({ application });
@@ -15,7 +15,7 @@ const server = Bun.serve({
     "/api/*": api,
     "/health": async () => {
       try {
-        await db.command({ ping: 1 }, { timeoutMS: 3000 });
+        await getDb().command({ ping: 1 }, { timeoutMS: 3000 });
         return Response.json({ status: "ok" }, { headers: { "Cache-Control": "no-store" } });
       } catch {
         return Response.json(
