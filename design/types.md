@@ -1,14 +1,8 @@
 # Shift Happens Application Types
 
 ```types
-concrete Household
-  A group whose residents share chores.
-
 concrete Person
-  A person who can receive contribution credit.
-
-concrete TaskOccurrence
-  A specific dated task that can earn contribution credit.
+  A person of the app (TBA from Registering) 
 
 concrete PhotoReference
   A reference to a submitted or baseline photo.
@@ -18,14 +12,28 @@ concrete ReviewerIdentity
 ```
 
 ```instances
-instantiate Ranking with
-  Group is Household
+instantiate HouseholdManaging 
   Person is Person
-  Contribution is TaskOccurrence
+
+instantiate ChoreCataloguing with
+  Group is HouseholdManaging.Household
+  Category is HouseholdManaging.Category
+  Photo is PhotoReference
+
+instantiate TaskScheduling with
+  Person is Person
+  Group is HouseholdManaging.Household
+  Category is HouseholdManaging.Category
+  Item is ChoreCataloguing.Chore
+
+instantiate Ranking with
+  Group is HouseholdManaging.Household
+  Person is Person
+  Contribution is TaskScheduling.Task
 
 instantiate PhotoChecking with
   Person is Person
-  Subject is TaskOccurrence
+  Subject is TaskScheduling.Task
   Photo is PhotoReference
   Reviewer is ReviewerIdentity
 ```

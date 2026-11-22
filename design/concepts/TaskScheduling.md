@@ -1,4 +1,4 @@
-# Scheduling
+# TaskScheduling
 
 ## Purpose
 
@@ -17,55 +17,41 @@ The planner tries to set Saturday's trash to Caleb, but it is refused because Ca
 Later, Millie removes her Saturday availability. The trash goes back to being unscheduled, so it never stays with someone who can't do it.
 
 ## Types
-
 ```types
 external Group
   The group whose work is being scheduled, such as a household.
 
 external Person
-  Someone who can be scheduled.
+  A user who can be scheduled for a job.
 
 external Job
-  A piece of work at a specific time, such as Monday's sink cleaning.
+  A specified, schedulable instance of work.
 
 external Category
   What sort of work a job is, such as kitchen or bathroom.
 
-enum Preference
-  prefer
-  neutral
-  avoid
+opaque Interval
+  A time interval with a start DateTime and an end DateTime.
 
-enum Source
-  auto
-  manual
+enum PreferenceLevel is PREFER, NEUTRAL, or AVOID
+  How a person feels about a category of work.
+
+enum Source is AUTO or MANUAL
+  Whether a job's assignment was set automatically or by hand.
 ```
 
 ## State
-
 ```state
-a set of Users with
+a set of Availabilities with
   a group Group
   a person Person
-  unique group and person
-
-a set of Availabilities with
-  a user User
-  a start DateTime
-  an end DateTime
-
-a set of Preferences with
-  a user User
-  a category Category
-  a preference Preference
-  unique user and category
+  an interval Interval
 
 a set of Jobs with
   a group Group
   a job Job
   a category Category
-  a start DateTime
-  a due DateTime
+  an interval Interval
   a weight Number
   an optional person Person
   an optional source Source
@@ -81,27 +67,7 @@ Rule: a person's total in a group is the sum of the weights of the jobs schedule
 ```
 
 ## Actions
-
 ```actions
-join(group: Group, person: Person) : returns (user: User)
-  where person is already a user in group
-  then
-    refuses ALREADY_JOINED "You are already on this schedule."
-  where person is not a user in group
-  then
-    add a new user with group and person
-    returns user
-
-leave(group: Group, person: Person) : returns (freed: set (job: Job))
-  where person is not a user in group
-  then
-    refuses NOT_JOINED "You are not on this schedule."
-  where person is a user in group
-  then
-    clear person and source from every job in group scheduled for person that starts after now
-    remove the user with their availabilities and preferences
-    returns the jobs that were cleared
-
 addAvailability(group: Group, person: Person, start: DateTime, end: DateTime) : returns (availability: Availability)
   where person is not a user in group
   then
@@ -203,7 +169,6 @@ reset(group: Group, from: DateTime, until: DateTime) : returns (cleared: set (jo
 ```
 
 ## Queries
-
 ```queries
 _schedule(group: Group, from: DateTime, until: DateTime) : set (
   job: Job, category: Category, start: DateTime, due: DateTime, weight: Number,
