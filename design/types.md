@@ -28,4 +28,9 @@ instantiate PhotoChecking with
   Subject is TaskOccurrence
   Photo is PhotoReference
   Reviewer is ReviewerIdentity
+
+instantiate Registering
+
+instantiate Authenticating with
+  User is Registering.User
 ```

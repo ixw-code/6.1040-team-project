@@ -65,6 +65,25 @@ Defined in [Ranking](../design/concepts/Ranking.md), line 1.
   - `Group` is `Household` — [Shift Happens Application Types](../design/types.md), line 22.
   - `Person` is `Person` — [Shift Happens Application Types](../design/types.md), line 23.
 
+### Registering
+
+Defined in [Registering](../design/concepts/Registering.md), line 1.
+
+#### Actions
+
+- `register(username: String) : returns (user: User)`
+  - Refuses `INVALID_USERNAME`: A username must have 3 to 32 letters, digits, underscores, or hyphens.
+  - Refuses `USERNAME_TAKEN`: That username is taken.
+
+#### Queries
+
+- `_byUsername(username: String) : optional (user: User)`
+- `_username(user: User) : optional (username: String)`
+
+#### Instances
+
+- `Registering` — instance of `Registering` — [Shift Happens Application Types](../design/types.md), line 32.
+
 ## Application types
 
 Concrete types:
