@@ -202,25 +202,31 @@ autoSchedule(
     preferenceLevel: PreferenceLevel, 
     category: Category
   )
+  onlyUnassigned: Flag
 ): returns (
   scheduled: set (task: Task, person: Person),
   unassigned: set (task: Task)
 )
   where from is not before until
-then
+  then
     refuse SCHEDULE_WINDOW_INVALID "The period must end after it starts."
-  where preferences references a person not in people or multiple preference levels are given for one category
+  where preferences references a person not in people or multiple preference levels are given for one person and category
   then
     refuse PREFERENCES_INVALID "The supplied preferences are invalid."
   where [from, until) is a valid interval
   then
-    for each task in group with no person whose start is between from and until, in order of start:
+    if onlyUnassigned is false
+      clear assignee and source from every incomplete task in group
+      whose scheduled interval starts in [from, until) and whose source is AUTO
+    for each incomplete task in group whose interval start is in [from, until) in order of start:
+      if task source is MANUAL or (onlyUnassigned is true and task has an assignee)
+        skip rescheduling for this task 
+      otherwise
       among users available for the job, choose the one with the lowest
         cost = their total + the job's weight × (0.5 if prefer, 1 if neutral, 2 if avoid),
         breaking remaining ties at random
       if someone was chosen, set the job's person to them and its source to AUTO
       otherwise leave the task unassigned
-    leave tasks that already have a person unchanged
     return the newly scheduled tasks and the unassigned tasks
 
 setSchedule(group: Group, entries: set (task: Task, assignee: Person?) ): returns (entries: set (task: Task, assignee: Person?) )
@@ -371,7 +377,7 @@ _availability(group: Group, person: Person) : many (
 ) 
   Returns the person's availabilities, ordered by earliest start.
 
-_workloads(group: Group, person: Person) : (workload: Number)
+_workload(group: Group, person: Person) : (workload: Number)
   Returns the calculated total assigned workload of a person in the group.
 ```
 
