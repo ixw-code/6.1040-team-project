@@ -58,3 +58,9 @@ bun run dev:backend
 ```sh
 bun run dev:frontend
 ```
+
+## Backend tests
+
+Run the backend tests with `bun test tests/` while MongoDB is running.
+The CompletionChecking tests supply temporary sessions, roles, and tasks. The application
+requires the team's implementations of those operations to serve authenticated requests.

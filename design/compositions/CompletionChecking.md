@@ -6,7 +6,7 @@ PhotoChecking stores submissions and decisions. TaskTracking records task comple
 
 ## Submitting a completed task
 
-A signed-in resident can submit evidence for an active task assigned to them in their household.[submit-access] The submission endpoint checks the session and assignment before recording the photo.[submit] The session identifies the submitter, so a resident cannot submit under another person’s identity.
+A signed-in resident can submit evidence for an active task assigned to them in their household. The submission endpoint checks the session and assignment before recording the photo. The session identifies the submitter, so a resident cannot submit under another person’s identity.
 
 The resident opens the task to see its completion criteria, photo instructions, and baseline image. Submitting records the photo, submission time, a saved copy of the criteria, and baseline for that attempt. Later changes to the task’s instructions do not change how an existing submission is reviewed.
 
@@ -14,60 +14,44 @@ A new submission starts as pending. Submitting a photo does not mark the task co
 
 Manual submissions enter the Overseer’s review queue without creating a Reasoning request.
 
-[submit-access]: view:CompletionChecking.CanSubmit
-[submit]: reaction:CompletionChecking.Submit
-
-```endpoints
-CompletionChecking.Submit at /completion/submit
-```
-
 ## Reading submissions
 
-Residents can read their own submissions. Overseers can read submissions for households they oversee.[read-access] Other residents cannot open someone else’s submission.
+Residents can read their own submissions. Overseers can read submissions for households they oversee. Other residents cannot open someone else’s submission.
 
-The completion endpoint checks access before returning the task and its submissions.[get] The current submission includes its photo, status, feedback, submission time, and review time.[details] Review time is empty while the submission is pending. Earlier attempts and their decisions appear in the submission history.[history]
+The completion endpoint checks access before returning the task and its submissions. The `current` list holds at most one visible submission with its photo, status, feedback, submission time, and review time. Review time is empty while the submission is pending. Earlier attempts and their decisions appear in the submission history. Each record is checked against the reader's household role and the original submitter.
 
 Submission time and review time remain separate. A resident who submitted before the deadline can show that even if the Overseer reviews it afterward.
 
 Unauthorized requests return `NOT_FOUND` without revealing another household’s tasks or photos.
 
-[read-access]: view:CompletionChecking.CanRead
-[get]: reaction:CompletionChecking.GetCompletion
-[details]: former:CompletionChecking.CompletionDetails
-[history]: former:CompletionChecking.SubmissionHistory
-
-```endpoints
-CompletionChecking.GetCompletion at /completion/get
-```
-
 ## Approving or rejecting a submission
 
-Only an Overseer for the submission’s household can review it.[review-access] The review endpoint checks the session and this permission before recording a decision.[review]
+Only an Overseer for the submission’s household can review it. The review endpoint checks the session and this permission before recording an approval or rejection.
 
-The review queue lists current submissions awaiting manual review in that household.[queue] Each item includes the resident, task, photo, completion criteria, baseline, and submission time.[queue-details] The Overseer can inspect the evidence and approve or reject it from the same screen.
+The review queue lists current submissions awaiting manual review in that household. Each item includes the resident, task, photo, completion criteria, baseline, and submission time. The Overseer can inspect the evidence and approve or reject it from the same screen.
 
 Approval records the reviewer and review time. Rejection also requires a reason explaining what needs to be corrected or shown more clearly. The resident sees that reason and can submit another attempt. The rejected submission and its feedback remain in the history.
 
 Only pending submissions can receive a decision. An approved submission cannot be withdrawn, changed, or reviewed again. A rejected submission keeps its decision; another attempt creates a new submission.
 
-[review-access]: view:CompletionChecking.CanReview
-[review]: reaction:CompletionChecking.Review
-[queue]: reaction:CompletionChecking.ListReviewQueue
-[queue-details]: former:CompletionChecking.ReviewQueue
-
-```endpoints
-CompletionChecking.Review at /completion/review
-CompletionChecking.ListReviewQueue at /completion/review-queue
-```
-
 ## Completion and contribution credit
 
-Approving the current submission records the task as complete in TaskTracking.[complete] The completion identifies the supporting submission and keeps both its submission and approval times. A rejected or pending submission does not complete the task.
+Approving the current submission calls the task completion hook. The completion identifies the supporting submission and keeps both its submission and approval times. Only an approval completes the task.
 
-Recording task completion gives the submitting resident one point through Ranking.[credit] The point belongs to the specific task occurrence, rather than each photo or review. Repeated processing of the same approval does not award extra points. Completing another occurrence of the same chore can earn another point.
+Once the hook confirms task completion, Ranking credits the submitting resident one point for that task occurrence. An Overseer can retry an approval to finish recording completion or credit after an interruption. A retry uses the original approval, and each task occurrence earns a single point.
 
-[complete]: reaction:CompletionChecking.RecordCompletion
-[credit]: reaction:CompletionChecking.AwardCredit
+## Manual API
+
+All four endpoints accept JSON via `POST`.
+
+| Path | Fields |
+| --- | --- |
+| `/api/completion/submit` | `session`, `task`, `photo` |
+| `/api/completion/get` | `session`, `task` |
+| `/api/completion/review` | `session`, `submission`, `decision`, optional `feedback` |
+| `/api/completion/review-queue` | `session`, `household` |
+
+CompletionChecking resolves the caller's session on the server and uses team-provided hooks for roles, task details, and completion. The application returns `UNAUTHORIZED` until those hooks are connected. The automated tests supply temporary data for these dependencies.
 
 ## Choosing AI review - Beta
 
@@ -121,11 +105,3 @@ An assessment cannot change an approved or rejected submission, overwrite a huma
 
 [apply]: reaction:CompletionChecking.ApplyAssessment
 [refer]: reaction:CompletionChecking.ReferForHumanReview
-
-## Notes
-
-Alpha supports photo submission, manual approval or rejection, completion tracking, and contribution credit. Beta adds optional AI review.
-
-Household access and role checks belong in the composition. PhotoChecking uses generic people and subjects without depending on household roles.
-
-The TaskTracking action names and completion events must be agreed on with its designer. Ranking must prevent duplicate credit for the same task occurrence.
