@@ -194,7 +194,7 @@ remove(household: Household) : returns (household: Household)
 _household(household: Household) : (name: String, overseer: Person)
   Return the household details.
 
-_householdsByPerson(person: Person) : many (name: String, overseer: Person, categories: set of Category)
+_householdsByPerson(person: Person) : many (household: Household, name: String, overseer: Person, categories: set of Category)
   Returns the households that the person is a resident of, in alphabetical order by name.
 
 _categories(household: Household) : many (category: Category)
