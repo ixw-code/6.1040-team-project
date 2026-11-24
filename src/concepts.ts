@@ -11,7 +11,7 @@ import { taskScheduling } from "./concepts/TaskScheduling/registry.ts";
 
 import {
     assignmentDate, assignmentInterval, assignmentIsIncomplete,
-    assignmentPeople, assignmentStatus, matchesPersonalTask,
+    assignmentPeople, assignmentStatus, matchesPersonalTask, availabilityWindows,
 } from "./compositions/assignmentComputations.ts";
 
 export const applicationConceptSet = conceptSet({
@@ -25,6 +25,6 @@ export const applicationConceptSet = conceptSet({
     Sessioning: sessioning
 }, {
     assignmentDate, assignmentInterval, assignmentIsIncomplete,
-    assignmentPeople, assignmentStatus, matchesPersonalTask,
+    assignmentPeople, assignmentStatus, matchesPersonalTask, availabilityWindows,
 });
 export const { concepts, computations } = applicationConceptSet;

@@ -25,6 +25,7 @@ The [can-edit-availability view](view:ChoreAssignments.CanEditAvailability) allo
 Residents without availability cannot be assigned automatically. The schedule page can warn residents and the overseer when availability is missing. (Through UI behavior, Notifying concept currently isn't supported).
 
 ```endpoints
+ChoreAssignments.EditAvailability at /assignments/availability/edit
 ChoreAssignments.AddAvailability at /assignments/availability/add
 ChoreAssignments.RemoveAvailability at /assignments/availability/remove
 ```
@@ -82,7 +83,7 @@ Persistent offers, acceptance, rejection, and cancellation require Trading. Swap
 
 ## Reading the schedule
 
-Signed-in residents see the whole household's schedule through the [GetSchedule endpoint](reaction:ChoreAssignments.GetSchedule). It uses a [HouseholdSchedule former](former:ChoreAssignments.HouseholdSchedule) combining `TaskScheduling._schedule` with chore details from `ChoreCataloguing` and category information from `HouseholdManaging`, returning each task's chore, deadline, scheduled interval, assignee, assignment source (`AUTO` or `MANUAL`), and completion status. The [ScheduleTaskDetails former](former:ChoreAssignments.ScheduleTaskDetails) preserves the task's category and weight snapshot and uses the [ChoreDetails former](former:ChoreAssignments.ChoreDetails) for current catalogue details. A missing catalogue entry or category name does not hide the task. A [CanReadSchedule view](view:ChoreAssignments.CanReadSchedule) verifies household membership. Requests from non-residents for another household's schedule return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
+The [GetTask endpoint](reaction:ChoreAssignments.GetTask) returns one task with the same household membership check and schedule details. Signed-in residents see the whole household's schedule through the [GetSchedule endpoint](reaction:ChoreAssignments.GetSchedule). It uses a [HouseholdSchedule former](former:ChoreAssignments.HouseholdSchedule) combining `TaskScheduling._schedule` with chore details from `ChoreCataloguing` and category information from `HouseholdManaging`, returning each task's chore, deadline, scheduled interval, assignee, assignment source (`AUTO` or `MANUAL`), and completion status. The [ScheduleTaskDetails former](former:ChoreAssignments.ScheduleTaskDetails) preserves the task's category and weight snapshot and uses the [ChoreDetails former](former:ChoreAssignments.ChoreDetails) for current catalogue details. A missing catalogue entry or category name does not hide the task. A [CanReadSchedule view](view:ChoreAssignments.CanReadSchedule) verifies household membership. Requests from non-residents for another household's schedule return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
 
 Residents can also see their own tasks through the [MyTasks endpoint](reaction:ChoreAssignments.GetMyTasks). It uses a [MyTasks former](former:ChoreAssignments.MyTasks) to retrieve tasks assigned to or completed by the requesting resident. The [PersonalTaskMatches view](view:ChoreAssignments.PersonalTaskMatches) selects assigned tasks, completed tasks, or both using the optional mode. Queries use a supplied UTC window and return `SCHEDULE_WINDOW_INVALID` if the start is not before the end.
 
@@ -93,12 +94,15 @@ Residents can see their own [availability](reaction:ChoreAssignments.GetAvailabi
 Requests are refused with `NOT_FOUND` when the household, task, or requested resident does not exist, `ACCESS_DENIED` when the requester lacks permission to access the information, or `UNAUTHENTICATED` when the requester is not signed in.
 
 ```endpoints
+ChoreAssignments.GetTask at /assignments/task
 ChoreAssignments.GetSchedule at /assignments/schedule
 ChoreAssignments.GetMyTasks at /assignments/mine
 ChoreAssignments.GetTotal at /assignments/total
 ChoreAssignments.GetAvailability at /assignments/availability
 ChoreAssignments.GetHouseholdOverview at /assignments/overview
 ```
+
+The [EditAvailability endpoint](reaction:ChoreAssignments.EditAvailability) applies a resident’s selected dates together. Removing part of a time block preserves the free time on either side.
 
 ## Notes
 ### Assumptions
@@ -107,6 +111,8 @@ The composition assumes that all household residents, including the overseer, ar
 We also assume that tasks are created manually for a given week by the overseer prior to assignment. Timing inputs use UTC ISO timestamps and intervals use start and end. The request flow supplies the clock for display status.
 
 ```computations
+availabilityWindows(windows: IntervalInputs) : IntervalSet
+  Converts a batch of UTC timestamp pairs into availability intervals.
 assignmentDate(value: String) : DateTime
   Converts a validated UTC timestamp to a date, or maps null to an absent optional date.
 assignmentInterval(value: IntervalInput) : Interval

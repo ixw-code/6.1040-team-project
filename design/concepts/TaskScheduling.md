@@ -44,6 +44,9 @@ Source is AUTO or MANUAL
 Status is PENDING or OVERDUE or COMPLETED or COMPLETED_LATE
   Whether atask has been completed or not, in regards to its deadline.
 
+opaque IntervalSet
+  A list of availability intervals.
+
 opaque PersonSet
   A set of rows, each with a person: Person.
 
@@ -173,6 +176,16 @@ addAvailability(group: Group, person: Person, start: DateTime, end: DateTime): r
   then
     add a new availability with the group, person, and interval [start, end)
     returns availability
+
+editAvailability(group: Group, person: Person, windows: IntervalSet, adding: Flag): returns (freed: TaskSet)
+  where windows is empty or contains an invalid interval
+  then
+    refuses TASK_INTERVAL_INVALID "Each availability window must end after it starts."
+  where all windows are valid
+  then
+    atomically adds coverage or subtracts the windows from this person's availability
+    when subtracting, clears incomplete assignments that no longer have full coverage
+    returns freed
 
 removeAvailability(availability: Availability): returns (freed: TaskSet)
   where availability doesn't exist

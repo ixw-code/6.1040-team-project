@@ -3,7 +3,7 @@ import { compute, each, former, is, no, now, reaction, view, when, where, whethe
 import { concepts, computations } from "../concepts.ts";
 
 const { HouseholdManaging, ChoreCataloguing, TaskScheduling, Sessioning } = concepts;
-const { assignmentDate, assignmentInterval, assignmentPeople, assignmentStatus, matchesPersonalTask, assignmentIsIncomplete } = computations;
+const { assignmentDate, assignmentInterval, assignmentPeople, assignmentStatus, matchesPersonalTask, assignmentIsIncomplete, availabilityWindows } = computations;
 
 const CanManageSchedule = view("(requester) oversees (household)", ({ requester, household }) =>
   where(HouseholdManaging._household({ household }).is({ overseer: requester })),
@@ -173,6 +173,18 @@ const AddAvailability = route("availability/add", { person: text, start: date, e
   );
 });
 
+const EditAvailability = route("availability/edit", {
+  windows: value => Array.isArray(value) && value.length > 0 && value.length <= 31 && value.every(interval),
+  adding: value => typeof value === "boolean",
+}, ({ session, household, person, windows, adding, intervals, freed }) =>
+  receive({ session, household, windows, adding }).then(Sessioning.use({ session }).responds({ subject: person })).then(
+    missingHousehold(household), denied(household, CanReadSchedule({ requester: person, household })),
+    where(residentExists(household, person), compute(availabilityWindows, { windows }, intervals))
+      .then(TaskScheduling.editAvailability({ group: household, person, windows: intervals, adding }).responds({ freed }))
+      .then(respond({ freed })).named("edited"),
+  ),
+);
+
 const RemoveAvailability = route("availability/remove", { person: text, availability: text }, (
   { session, requester, household, person, availability, freed },
 ) => {
@@ -296,6 +308,16 @@ const GetSchedule = route("schedule", windowFields, ({ session, requester, house
   );
 });
 
+const GetTask = route("task", { task: text }, ({ session, requester, household, task, asOf }) => {
+  const allowed = CanReadSchedule({ requester, household });
+  const exists = TaskScheduling._get({ task }).is({ group: household });
+  return receive({ session, household, task }).then(Sessioning.use({ session }).responds({ subject: requester })).then(
+    missingHousehold(household), denied(household, allowed),
+    where(allowed, no(exists)).then(respond({ error: "NOT_FOUND" })).named("missingTask"),
+    where(allowed, exists, now(asOf)).then(respond({ task: ScheduleTaskDetails({ household, task, asOf }) })).named("task"),
+  );
+});
+
 const GetMyTasks = route("mine", {
   ...windowFields, mode: (value) => value === "all" || value === "assigned" || value === "completed",
 }, ({ session, requester, household, from, until, mode, fromDate, untilDate, asOf }) => {
@@ -347,7 +369,7 @@ export const composition = {
   CanManageSchedule, CanReadSchedule, CanEditAvailability, CanReadHouseholdDetails,
   ValidHouseholdChore, AssignmentIsModifiable, HouseholdPreferences,
   PersonAvailability, ResidentWorkload, HouseholdOverview, ChoreDetails, ScheduleTaskDetails, HouseholdSchedule, PersonalTaskMatches, MyTasks,
-  ResidentRemoved, RetryResidentCleanup, AddAvailability, RemoveAvailability, CreateTask, RemoveTask,
+  ResidentRemoved, RetryResidentCleanup, AddAvailability, EditAvailability, RemoveAvailability, CreateTask, RemoveTask,
   UpdateDeadline, UpdateInterval, AutoSchedule, WeeklyAutoSchedule, Reset, SetSchedule,
-  GetSchedule, GetMyTasks, GetTotal, GetAvailability, GetHouseholdOverview,
+  GetSchedule, GetTask, GetMyTasks, GetTotal, GetAvailability, GetHouseholdOverview,
 };

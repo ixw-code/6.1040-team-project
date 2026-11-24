@@ -6,7 +6,8 @@ import BackLink from "../components/BackLink.vue";
 import PhotoBox from "../components/PhotoBox.vue";
 import { ATTEMPT_BORDER, ATTEMPT_LABEL, formatDate, formatDateTime, isOpen, noteColor, statusText } from "../display.ts";
 import { useNav } from "../nav.ts";
-import { getPeople, getTask } from "../residentApi.ts";
+import { useResidentApi } from "../residentApi.ts";
+const { getPeople, getTask } = useResidentApi();
 import type { Person, Task } from "../types.ts";
 
 const props = defineProps<{ taskId: string }>();
@@ -52,7 +53,7 @@ function onPhoto(event: Event) {
         <dt class="rs-heading">Status:</dt>
         <dd class="rs-hand">{{ statusText(task.status, owner) }}</dd>
         <dt class="rs-heading nowrap">Assigned to:</dt>
-        <dd class="rs-hand">{{ mine ? `${owner?.name} (you)` : owner?.name }}</dd>
+        <dd class="rs-hand">{{ mine ? `${owner?.name} (you)` : owner?.name ?? 'Unassigned' }}</dd>
       </dl>
 
       <template v-if="open">
@@ -63,12 +64,8 @@ function onPhoto(event: Event) {
             Take Photo
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
           </button>
-          <input ref="camera" type="file" accept="image/*" capture="environment" hidden @change="onPhoto" />
+          <input ref="camera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden @change="onPhoto" />
         </template>
-        <button v-else type="button" class="rs-pill rs-pill--big rs-heading" @click="nav.go({ name: 'swap', taskId: task.id })">
-          Swap Task
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3" /></svg>
-        </button>
       </template>
 
       <section>

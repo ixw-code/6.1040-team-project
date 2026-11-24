@@ -11,7 +11,7 @@ export type Screen =
   | { name: "photo"; taskId: string; file: File }
   | { name: "attempt"; taskId: string; attemptId: string }
   | { name: "image"; url: string | null; label: string }
-  | { name: "availabilityForm" }
+  | { name: "availabilityForm"; removing?: boolean }
   | { name: "swap"; taskId: string };
 
 const BACK_LABEL: Record<Screen["name"], string> = {

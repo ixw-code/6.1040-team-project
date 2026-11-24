@@ -1,6 +1,8 @@
 import { createGateway } from "@mit-sdg/sync-engine/boundary";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { assembleApplication } from "./assembly.ts";
+import { createCatalogHandler } from "./compositions/Catalog.ts";
+import { completionHooks } from "./compositions/completionHooks.ts";
 import { createCompletionHandler } from "./compositions/CompletionChecking.ts";
 import { createPhotoHandler, createPhotoStore } from "./compositions/Photos.ts";
 import { maxRequestBodyBytes, policy } from "./http.ts";
@@ -20,7 +22,8 @@ const server = Bun.serve({
   routes: {
     "/api/photos": photos,
     "/api/photos/:photo": photos,
-    "/api/completion/*": createCompletionHandler(application.concepts, photoStore),
+    "/api/catalog/*": createCatalogHandler(application.concepts, photoStore),
+    "/api/completion/*": createCompletionHandler(application.concepts, photoStore, completionHooks(application.concepts)),
     "/api/*": api,
     "/health": async () => {
       try {

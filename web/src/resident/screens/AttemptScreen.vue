@@ -4,7 +4,8 @@ import BackLink from "../components/BackLink.vue";
 import PhotoBox from "../components/PhotoBox.vue";
 import { ATTEMPT_COLOR, ATTEMPT_LABEL, formatDateTime } from "../display.ts";
 import { useNav } from "../nav.ts";
-import { getTask } from "../residentApi.ts";
+import { useResidentApi } from "../residentApi.ts";
+const { getTask } = useResidentApi();
 import type { Task } from "../types.ts";
 
 const props = defineProps<{ taskId: string; attemptId: string }>();

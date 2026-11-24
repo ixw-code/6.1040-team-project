@@ -1,5 +1,4 @@
-// Shapes the resident screens work with. The placeholder API in residentApi.ts returns these;
-// when real endpoints land, map their wire output into these shapes there, not in the screens.
+// View models used by the resident screens.
 
 /** A task's status from its assignee's side. */
 export type TaskStatus = "todo" | "submitted" | "approved" | "redo";
@@ -17,7 +16,7 @@ export interface Person {
 
 export interface Attempt {
   id: string;
-  /** Null until real photo storage exists; screens show a placeholder. */
+  /** A session-protected image URL when evidence is available. */
   photoUrl: string | null;
   submittedAt: string;
   status: AttemptStatus;
@@ -32,6 +31,7 @@ export interface Task {
   ownerId: string;
   /** Start of the window the task can be done in (ISO). */
   start: string;
+  end?: string;
   /** Deadline (ISO). */
   due: string;
   status: TaskStatus;

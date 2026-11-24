@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { api } from "./api.ts";
 
 interface Me {
+  user: string;
   username: string;
 }
 
@@ -32,7 +33,8 @@ async function enter(answer: Promise<object>, messages: Record<string, string>):
 
 /** Signs out, then reloads the page so that the tab's uploads, polling, and requests stop. */
 async function signOut() {
-  await api.user.logout();
+  const result = await api.user.logout();
+  if ("error" in result && result.error !== "UNAUTHORIZED") throw new Error("Sign out failed. Try again.");
   window.location.assign("/");
 }
 

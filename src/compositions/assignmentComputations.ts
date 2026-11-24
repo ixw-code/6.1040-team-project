@@ -31,3 +31,7 @@ export function assignmentStatus({
 export function assignmentIsIncomplete({ completedAt }: { completedAt?: Date }): { incomplete: boolean } {
   return { incomplete: completedAt == null };
 }
+
+export function availabilityWindows({ windows }: { windows: { start: string; end: string }[] }) {
+  return windows.map(({ start, end }) => ({ start: new Date(start), end: new Date(end) }));
+}

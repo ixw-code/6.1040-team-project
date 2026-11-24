@@ -179,3 +179,27 @@ textarea[aria-invalid="true"] { border-color: #b7554c; }
   .detail-heading { flex-wrap: wrap; }
   .upload-actions .button-primary { margin-left: 0; }
 }
+
+.alpha-bar { display: flex; flex-wrap: wrap; justify-content: space-between; padding-block: .75rem; }
+.alpha-bar .profile { margin-left: auto; }
+.alpha-bar select, .alpha-card input, .alpha-card select, .alpha-card textarea,
+.schedule-row select, .sign-in input {
+  font: inherit; color: var(--ink); background: white; border: 1px solid #9dad9f;
+  padding: .48rem .68rem; border-radius: .4rem; min-width: 0; max-width: 100%;
+}
+.alpha-card, .alpha-card form, .management, .sign-in .form-card { display: grid; align-content: start; gap: 1rem; }
+.alpha-card, .sign-in .form-card { padding: 1.35rem; }
+.alpha-card label, .sign-in label { display: grid; gap: .3rem; font-weight: 600; }
+.alpha-card button { justify-self: start; }
+.alpha-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 25rem), 1fr)); }
+.actions-inline, .schedule-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.schedule-row { justify-content: space-between; padding: .65rem; border-bottom: 1px solid var(--line); }
+.board-nav { width: fit-content; max-width: 100%; margin-bottom: 1rem; flex-wrap: wrap; }
+.sign-in { max-width: 30rem; }
+.sign-in .form-card { background: white; border: 1px solid var(--line); border-radius: 1rem; }
+.sign-in .hint { color: var(--muted); font-size: .88rem; font-weight: 400; }
+.sign-in .button { background: var(--green); color: white; }
+.sign-in .text-button { color: var(--green); background: transparent; border: 0; text-decoration: underline; }
+.field-error, .refusal { color: var(--red); }
+
+.settings-fields { border: 0; margin: 0; padding: 0; display: grid; gap: 1rem; }

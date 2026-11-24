@@ -26,16 +26,17 @@ export type TaskCompletion = {
   reviewedAt: Date;
 };
 
-// Connect the team's role and task operations here when they are available.
+// Task and membership lookups are supplied by the scheduling and household concepts.
 export interface CompletionHooks {
   task(task: string): CompletionTask | undefined | Promise<CompletionTask | undefined>;
   role(household: string, person: string): HouseholdRole | undefined | Promise<HouseholdRole | undefined>;
+  householdTasks?(household: string): Promise<{ task: string }[]>;
   recordCompletion(completion: TaskCompletion): Promise<void>;
 }
 
 const prefix = "/api/completion/";
-const paths = new Set(["submit", "get", "review", "review-queue"].map((name) => prefix + name));
-const submissionPhotoPath = /^\/api\/completion\/submissions\/([\da-f-]{36})\/photo$/;
+const paths = new Set(["submit", "get", "review", "review-queue", "reviewed"].map((name) => prefix + name));
+const submissionPhotoPath = /^\/api\/completion\/submissions\/([\da-f-]{36})\/(photo|baseline)$/;
 const errorCodes = {
   400: "INVALID_REQUEST",
   401: "UNAUTHORIZED",
@@ -86,6 +87,7 @@ function parseInput(operation: string, input: unknown) {
     case "get":
       if (only("task") && nonblank(task)) return { operation, task };
       return;
+    case "reviewed":
     case "review-queue":
       if (only("household") && nonblank(household)) return { operation, household };
       return;
@@ -147,7 +149,7 @@ export function createCompletionHandler(
 
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
-    const attachment = submissionPhotoPath.exec(path)?.[1];
+    const attachment = submissionPhotoPath.exec(path);
     if (!attachment && !paths.has(path)) return failure(404);
     if (!allowsAppOrigin(request)) return failure(403);
     if (request.method !== (attachment ? "GET" : "POST")) return failure(400);
@@ -158,13 +160,14 @@ export function createCompletionHandler(
       if (!hooks) return failure(503);
 
       if (attachment) {
-        const [details] = await PhotoChecking._submission({ submission: attachment });
+        const [details] = await PhotoChecking._submission({ submission: attachment[1] });
         const task = details && await hooks.task(details.subject);
         if (!task) return failure(404);
         const role = await hooks.role(task.household, person);
         if (role !== "OVERSEER" && (role !== "RESIDENT" || details.person !== person)) return failure(404);
         // Resolve the file from the authorized submission, including the original uploader.
-        const stored = await photos.read(details.photo, details.person);
+        const stored = attachment[2] === "baseline"
+          ? await photos.readReference(details.baseline) : await photos.read(details.photo, details.person);
         return stored ? photoResponse(stored) : failure(404);
       }
 
@@ -176,7 +179,7 @@ export function createCompletionHandler(
       switch (input.operation) {
         case "submit": {
           const task = await hooks.task(input.task);
-          if (!task?.active || task.assignee !== person || await hooks.role(task.household, person) !== "RESIDENT") {
+          if (!task?.active || task.completed || task.assignee !== person || !await hooks.role(task.household, person)) {
             return failure(404);
           }
           if (!await photos.owns(input.photo, person)) return failure(404);
@@ -194,6 +197,21 @@ export function createCompletionHandler(
         case "review-queue":
           if (await hooks.role(input.household, person) !== "OVERSEER") return failure(404);
           return await listQueue(input.household, (id) => hooks.task(id));
+        case "reviewed": {
+          if (await hooks.role(input.household, person) !== "OVERSEER") return failure(404);
+          const items = [];
+          for (const { task } of await hooks.householdTasks?.(input.household) ?? []) {
+            const entry = await hooks.task(task);
+            if (!entry) continue;
+            for (const row of await PhotoChecking._history({ subject: task })) {
+              if (row.status === "PENDING") continue;
+              const [details] = await PhotoChecking._submission({ submission: row.submission });
+              if (details) items.push({ ...details, ...row, task, title: entry.title });
+            }
+          }
+          items.sort((a, b) => b.reviewedAt!.getTime() - a.reviewedAt!.getTime());
+          return json({ queue: { items } });
+        }
         case "review": {
           const { submission, decision, feedback } = input;
           let [details] = await PhotoChecking._submission({ submission });

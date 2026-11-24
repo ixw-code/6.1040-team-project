@@ -233,6 +233,37 @@ export class TaskSchedulingConcept {
     }, true);
   }
 
+  async editAvailability({ group, person, windows, adding }: GroupRef & PersonRef & {
+    windows: Interval[]; adding: boolean;
+  }): Promise<{ freed: TaskRef[] }> {
+    if (!windows.length || windows.some(w => !validInterval(w.start, w.end))) {
+      throw new TaskIntervalInvalid("Each availability window must end after it starts.");
+    }
+    return this.#update(group, state => {
+      for (const interval of windows) {
+        if (adding) {
+          if (!availableFor(state, person, interval)) {
+            state.availabilities.push({ availability: crypto.randomUUID(), person, interval });
+          }
+          continue;
+        }
+        state.availabilities = state.availabilities.flatMap(block => {
+          const { start, end } = block.interval;
+          if (block.person !== person || start >= interval.end || end <= interval.start) return [block];
+          const remaining: Availability[] = [];
+          if (start < interval.start) remaining.push({ ...block, interval: { start, end: interval.start } });
+          if (end > interval.end) remaining.push({
+            availability: remaining.length ? crypto.randomUUID() : block.availability, person,
+            interval: { start: interval.end, end },
+          });
+          return remaining;
+        });
+      }
+      return { freed: adding ? [] : clearAssignments(state.tasks, task =>
+        task.assignee === person && !availableFor(state, person, task.interval!)) };
+    }, adding);
+  }
+
   async removeAvailability({ availability }: AvailabilityRef): Promise<{ freed: TaskRef[] }> {
     const group = await this.#groups().findOne({ "availabilities.availability": availability }, { projection: { _id: 1 } });
     if (!group) throw new AvailabilityNotFound(availabilityMissing);

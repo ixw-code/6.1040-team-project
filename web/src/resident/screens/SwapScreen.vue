@@ -5,7 +5,7 @@ import BackLink from "../components/BackLink.vue";
 import SwapPair from "../components/SwapPair.vue";
 import { formatDateTime, isOpen } from "../display.ts";
 import { useNav } from "../nav.ts";
-import { getMyTasks, getPeople, getTask, requestSwap } from "../residentApi.ts";
+import { getMyTasks, getPeople, getTask, requestSwap } from "../swapPreview.ts";
 import type { Person, Task } from "../types.ts";
 
 const props = defineProps<{ taskId: string }>();
