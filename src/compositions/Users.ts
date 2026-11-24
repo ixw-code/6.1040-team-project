@@ -19,7 +19,7 @@ const textInput: EndpointValidator = (value) => {
 };
 
 const identifyMe = endpoint(
-  "/auth/me",
+  "/user/me",
   ({ session, user, username }) =>
     receive({ session })
       .then(Sessioning.use({ session }).responds({ subject: user }))
@@ -30,7 +30,7 @@ const identifyMe = endpoint(
 );
 
 const SignOut = endpoint(
-  "/auth/logout",
+  "/user/logout",
   ({ session }) =>
     receive({ session })
       .then(Sessioning.end({ session }).responds({}))
@@ -48,12 +48,12 @@ export const accountsHttp = {
     name,
     input: "session",
     issue: startingSessions.map((path) => ({ path, value: "session", expires: "expiresAt" })),
-    clear: ["/auth/logout"],
+    clear: ["/user/logout"],
   }),
 } as const;
 
 const Register = endpoint(
-  "/auth/register",
+  "/user/register",
   ({ username, password, user, session, expiresAt }) =>
     receive({ username, password }).then(
       where(Authenticating._acceptable({ password }).is({ acceptable: true }))
@@ -70,7 +70,7 @@ const Register = endpoint(
 );
 
 const SignIn = endpoint(
-  "/auth/login",
+  "/user/login",
   ({ username, password, user, session, expiresAt }) =>
     receive({ username, password }).then(
       where(Registering._byUsername({ username }).is({ user }))
@@ -88,7 +88,7 @@ const SignIn = endpoint(
 /** The HTTP settings for these endpoints: the category for each refusal, and the endpoints that start a session. */
 export const passwordsHttp = {
   publicErrors: { INVALID_PASSWORD: "INVALID_REQUEST", PASSWORD_SET: "CONFLICT", INVALID_CREDENTIALS: "UNAUTHORIZED" },
-  startingSessions: ["/auth/register", "/auth/login"],
+  startingSessions: ["/user/register", "/user/login"],
 } as const;
 
 export const composition = {

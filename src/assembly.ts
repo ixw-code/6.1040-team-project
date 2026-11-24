@@ -6,12 +6,15 @@ import { getDb } from "./db.ts";
 import { RegisteringConcept } from "./concepts/Registering/Registering.ts";
 import { Authenticating } from "./concepts/Authenticating/registry.ts";
 import { Sessioning } from "./concepts/Sessioning/registry.ts";
+import { composition as Users } from "./compositions/Users.ts";
 
 // Use the app database by default and let tests supply an isolated database.
 export function assembleApplication(database = getDb) {
   return assemble({
     conceptSet: applicationConceptSet,
-    composition: {},
+    composition: {
+      Users,
+    },
     instances: {
       Ranking: new RankingConcept(database),
       PhotoChecking: new PhotoCheckingConcept(database),

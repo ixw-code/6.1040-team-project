@@ -8,7 +8,10 @@ export default {
   wireName: "ShiftHappensWire",
   design: {
     version: 1,
-    documents: [new URL("./design/types.md", import.meta.url)],
+    documents: [
+      new URL("./design/types.md", import.meta.url),
+      new URL("./design/compositions/Users.md", import.meta.url)
+    ],
   },
   projections: [httpWire({ policy, name: "ShiftHappensWireHttp" })],
 };
