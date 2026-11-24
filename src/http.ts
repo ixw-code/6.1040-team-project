@@ -19,3 +19,16 @@ export const policy = httpPolicy({
     session: accountsHttp.sessionCookie(sessionCookieName, passwordsHttp.startingSessions),
   },
 });
+
+export function allowsAppOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  return origin === null || origin === policy.publicOrigin;
+}
+
+export async function signedInPerson(request: Request, sessions: Sessioning): Promise<string | undefined> {
+  const cookies = new Bun.CookieMap(request.headers.get("cookie") ?? "");
+  const token = cookies.get(sessionCookieName);
+  if (!token) return;
+  const session = await sessions.use({ session: token as Session });
+  if (!("error" in session)) return session.subject;
+}

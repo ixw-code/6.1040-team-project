@@ -38,6 +38,7 @@ describe("Photo uploads", () => {
   const database = useMongoTestDb("photos");
 
   test("the owner can retrieve the exact uploaded bytes after signing in again", async () => {
+    expect(sessionCookieName).toBe("__Host-session");
     const first = requests(database);
     const { cookie } = await first.session("register", "photo-owner");
     const upload = await first.photo(uploadRequest({ cookie, origin: policy.publicOrigin }));
