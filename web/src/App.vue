@@ -1,41 +1,118 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, onMounted } from "vue";
-import EvidencePhoto from "./EvidencePhoto.vue";
-import {
-  choresById, createPreviewAttempts, residentChore, reviewAttempt, statusOf, submitPhoto,
-  type Decision, type Photo, type ReviewStatus,
-} from "./review-preview.ts";
+import { computed, nextTick, ref, onMounted, watch } from "vue";
+import PhotoBox from "./resident/components/PhotoBox.vue";
+import ResidentApp from "./resident/ResidentApp.vue";
+import { statusOf, type Attempt, type Chore, type Decision, type Photo, type ReviewStatus } from "./review-preview.ts";
+import { api } from "./api.ts";
+import { completionRequest, submissionImage } from "./completion-api.ts";
 import PasswordForm from "./PasswordForm.vue";
 import SignIn from "./SignIn.vue";
 import { useSession } from "./session.ts";
 
-const { me, checked, load } = useSession();
+const { me, checked, load, signOut } = useSession();
 onMounted(load);
 
-const role = ref<"overseer" | "resident">("overseer");
+const role = ref<"overseer" | "resident">("resident");
 const filter = ref<"pending" | "reviewed">("pending");
-const attempts = ref(createPreviewAttempts());
+const attempts = ref<Attempt[]>([]);
 const selectedId = ref("");
 const note = ref("");
 const noteError = ref("");
 const noteField = ref<HTMLTextAreaElement>();
 const announcement = ref("");
-const chosenPhoto = ref<{ photo: Photo; name: string }>();
-const fileProblem = ref("");
-const fileInput = ref<HTMLInputElement>();
-const localPhotos = new Set<string>();
+const homes = ref<{ household: string; name: string }[]>([]);
+const household = ref("");
+const choresById = ref<Record<string, Chore & { active: boolean; completed: boolean }>>({});
+const busy = ref(false);
+const saving = ref(false);
+const householdName = ref("");
+const problem = ref("");
+type Completion = { completion: {
+  task: { task: string; title: string; assignee: string; criteria: string; photoInstructions: string; baseline: string; active: boolean; completed: boolean };
+  history: { submission: string; submittedAt: string; reviewedAt: string | null; status: string; feedback: string }[];
+} };
+
+async function refresh() {
+  if (!household.value) return;
+  busy.value = true;
+  problem.value = "";
+  try {
+    const from = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const until = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const input = { household: household.value, from, until };
+    const queue = await completionRequest<{ queue: { items: { task: string }[] } }>("/completion/review-queue", { household: input.household });
+    const rows = await api.assignments.schedule(input);
+    if ("error" in rows) throw new Error(rows.error);
+    const taskIds = new Set(rows.tasks.filter((row) => row.assignee || row.completedBy).map(({ task }) => task));
+    for (const item of queue.queue.items) taskIds.add(item.task);
+    const tasks = await Promise.all([...taskIds].map(
+      (task) => completionRequest<Completion>("/completion/get", { task }).then((row) => row.completion),
+    ));
+    const photo = (url: string, alt: string): Photo => ({ url, alt });
+    choresById.value = Object.fromEntries(tasks.map(({ task }) => [task.task, {
+      id: task.task, title: task.title, resident: task.assignee, initials: "", active: task.active, completed: task.completed,
+      criteria: task.criteria, photoInstructions: task.photoInstructions, baseline: photo(task.baseline, "Baseline photo"),
+    }]));
+    attempts.value = tasks.flatMap(({ task, history }) => history.toReversed().map((row): Attempt => ({
+      id: row.submission, taskId: task.task, submittedAt: new Date(row.submittedAt),
+      photo: photo(submissionImage(row.submission), "Submitted photo"),
+      ...(row.reviewedAt && (row.status === "APPROVED" || row.status === "REJECTED") ? { review: {
+        decision: row.status === "APPROVED" ? "approved" : "rejected",
+        feedback: row.feedback, reviewedAt: new Date(row.reviewedAt),
+      } } : {}),
+    })));
+  } catch (error) {
+    problem.value = String(error);
+  } finally {
+    busy.value = false;
+  }
+}
+
+watch(me, async (user) => {
+  if (!user) {
+    role.value = "resident";
+    homes.value = [];
+    household.value = "";
+    return;
+  }
+  try {
+    const result = await api.households.mine();
+    if (me.value !== user) return;
+    if ("error" in result) throw new Error(result.error);
+    homes.value = result.households;
+    household.value = homes.value[0]?.household ?? "";
+  } catch (error) {
+    problem.value = String(error);
+  }
+});
+async function createHousehold() {
+  saving.value = true;
+  problem.value = "";
+  try {
+    const name = householdName.value.trim();
+    const result = await api.households.create({ name });
+    if ("error" in result) throw new Error(result.error);
+    homes.value = [...homes.value, { household: result.household, name }];
+    household.value = result.household;
+    householdName.value = "";
+  } catch (error) {
+    problem.value = String(error);
+  } finally {
+    saving.value = false;
+  }
+}
+
+watch([household, role], () => {
+  attempts.value = [];
+  choresById.value = {};
+  if (role.value === "overseer") void refresh();
+});
 
 const pending = computed(() => attempts.value.filter((attempt) => !attempt.review));
 const reviewed = computed(() => attempts.value.filter((attempt) => attempt.review).toReversed());
 const queue = computed(() => filter.value === "pending" ? pending.value : reviewed.value);
 const selected = computed(() => queue.value.find((attempt) => attempt.id === selectedId.value) ?? queue.value[0]);
-const chore = computed(() => selected.value && choresById[selected.value.taskId]);
-const residentAttempts = computed(() => attempts.value.filter((attempt) => attempt.taskId === residentChore.id));
-const residentSubmission = computed(() => residentAttempts.value.at(-1));
-const residentPhoto = computed(() => chosenPhoto.value?.photo ?? residentSubmission.value?.photo);
-const residentStatus = computed(() => statusOf(residentSubmission.value));
-const canSubmit = computed(() => residentStatus.value === "unsubmitted" || residentStatus.value === "rejected");
-
+const chore = computed(() => selected.value && choresById.value[selected.value.taskId]);
 const statusLabels: Record<ReviewStatus | "unsubmitted", string> = {
   pending: "Pending review",
   approved: "Approved",
@@ -48,6 +125,7 @@ const dateTime = new Intl.DateTimeFormat("en-US", {
 });
 
 function setRole(nextRole: "overseer" | "resident") {
+  if (busy.value || saving.value) return;
   if (role.value !== nextRole) announcement.value = "";
   role.value = nextRole;
 }
@@ -65,64 +143,27 @@ function showQueue(nextFilter: "pending" | "reviewed") {
 }
 
 async function saveReview(decision: Decision) {
-  if (!selected.value || !chore.value) return;
-  const result = reviewAttempt(selected.value, decision, note.value);
-  if (result === "missing-feedback") {
+  if (!selected.value || !chore.value || saving.value) return;
+  if (decision === "rejected" && !note.value.trim()) {
     noteError.value = "Add feedback so the resident knows what to fix.";
     await nextTick();
     noteField.value?.focus();
     return;
   }
-  if (result === "saved") {
-    announcement.value = decision === "approved" ? "Submission approved." : "Submission rejected and feedback shared.";
+  saving.value = true;
+  try {
+    await completionRequest("/completion/review", {
+      submission: selected.value.id, decision: decision === "approved" ? "APPROVE" : "REJECT", feedback: note.value,
+    });
     selectAttempt("");
+    await refresh();
+  } catch (error) {
+    noteError.value = String(error);
+  } finally {
+    saving.value = false;
   }
 }
 
-function clearDraftPhoto() {
-  const photo = chosenPhoto.value?.photo;
-  if (photo && "url" in photo) {
-    URL.revokeObjectURL(photo.url);
-    localPhotos.delete(photo.url);
-  }
-  chosenPhoto.value = undefined;
-}
-
-function chooseFile(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = "";
-  if (!file) return;
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) {
-    fileProblem.value = "Choose a JPG, PNG, or WebP photo up to 10 MB.";
-    return;
-  }
-  clearDraftPhoto();
-  fileProblem.value = "";
-  const url = URL.createObjectURL(file);
-  localPhotos.add(url);
-  chosenPhoto.value = { photo: { url, alt: "Resident's chore photo" }, name: file.name };
-}
-
-function useSample() {
-  clearDraftPhoto();
-  fileProblem.value = "";
-  chosenPhoto.value = { photo: residentChore.baseline, name: "Sample kitchen photo" };
-}
-
-function sendPhoto() {
-  if (!chosenPhoto.value || !canSubmit.value) return;
-  if (submitPhoto(attempts.value, residentChore.id, chosenPhoto.value.photo)) {
-    // The submission now owns the photo URL so it remains visible in the review queue.
-    chosenPhoto.value = undefined;
-    fileProblem.value = "";
-    announcement.value = "Photo sent for review.";
-  }
-}
-
-onUnmounted(() => {
-  for (const url of localPhotos) URL.revokeObjectURL(url);
-});
 </script>
 
 <template>
@@ -140,34 +181,44 @@ onUnmounted(() => {
           <span>Shift Happens</span>
         </div>
 
-        <nav class="role-switch" aria-label="Preview as">
+        <nav class="role-switch" aria-label="View">
           <button type="button" :aria-pressed="role === 'overseer'" @click="setRole('overseer')">Overseer view</button>
           <button type="button" :aria-pressed="role === 'resident'" @click="setRole('resident')">Resident view</button>
         </nav>
 
         <div class="profile">
-          <div class="profile-name">{{ role === 'overseer' ? 'Jim Brooks' : 'Alice Chen' }}</div>
-          <span class="avatar profile-avatar" aria-hidden="true">{{ role === 'overseer' ? 'JB' : 'AC' }}</span>
+          <div class="profile-name">{{ me.username }}</div>
+          <span class="avatar profile-avatar" aria-hidden="true">{{ me.username.slice(0, 2).toUpperCase() }}</span>
+          <button type="button" class="button button-secondary" @click="signOut">Sign out</button>
         </div>
       </div>
     </header>
 
-    <main class="workspace">
+    <main v-if="role === 'overseer'" class="workspace">
       <div class="page-heading">
         <div>
-          <p class="household"><span class="house-icon" aria-hidden="true"></span> Maple House</p>
+          <select v-model="household" aria-label="Household" :disabled="busy || saving">
+            <option value="" disabled>Select a household</option>
+            <option v-for="home in homes" :key="home.household" :value="home.household">{{ home.name }}</option>
+          </select>
           <h1>{{ role === 'overseer' ? 'Review queue' : 'My chores' }}</h1>
           <p class="page-description">
             {{ role === 'overseer' ? 'Compare resident photos with the baseline before making a decision.'
               : 'Check your assignment and submit a photo when the work is done.' }}
           </p>
         </div>
-        <span class="preview-label">Local preview</span>
+
       </div>
 
       <div class="notice" :class="{ 'notice-visible': announcement }" role="status">{{ announcement }}</div>
 
-      <div v-if="role === 'overseer'" class="review-layout">
+      <form @submit.prevent="createHousehold">
+        <label>New household <input v-model="householdName" required /></label>
+        <button type="submit" :disabled="busy || saving">Create household</button>
+      </form>
+      <p v-if="problem" role="alert">{{ problem }}</p>
+      <p v-if="busy" role="status">Loading…</p>
+      <div v-else-if="role === 'overseer'" class="review-layout">
         <aside class="panel queue-panel" aria-labelledby="submissions-heading">
           <div class="queue-heading">
             <h2 id="submissions-heading">Submissions</h2>
@@ -182,7 +233,7 @@ onUnmounted(() => {
           <ul v-if="queue.length" class="queue-list">
             <li v-for="attempt in queue" :key="attempt.id">
               <button type="button" class="queue-item" :aria-pressed="selected?.id === attempt.id" @click="selectAttempt(attempt.id)">
-                <span class="thumbnail"><EvidencePhoto :photo="attempt.photo" /></span>
+                <span class="thumbnail"><PhotoBox :url="'url' in attempt.photo ? attempt.photo.url : null" :label="attempt.photo.alt" /></span>
                 <span class="queue-item-info">
                   <strong>{{ choresById[attempt.taskId].title }}</strong>
                   <span>{{ choresById[attempt.taskId].resident }}</span>
@@ -213,11 +264,11 @@ onUnmounted(() => {
           <div class="photo-grid">
             <figure>
               <figcaption>Submitted photo</figcaption>
-              <EvidencePhoto :photo="selected.photo" />
+              <PhotoBox :url="'url' in selected.photo ? selected.photo.url : null" :label="selected.photo.alt" />
             </figure>
             <figure>
               <figcaption>Baseline photo</figcaption>
-              <EvidencePhoto :photo="chore.baseline" />
+              <PhotoBox :url="'url' in chore.baseline ? chore.baseline.url : null" :label="chore.baseline.alt" />
             </figure>
           </div>
 
@@ -259,67 +310,7 @@ onUnmounted(() => {
         </section>
       </div>
 
-      <div v-else class="resident-layout">
-        <article class="panel detail-card" aria-labelledby="resident-task">
-          <div class="detail-heading">
-            <div>
-              <h2 id="resident-task">{{ residentChore.title }}</h2>
-              <p class="resident-assignee">Assigned to {{ residentChore.resident }}</p>
-            </div>
-            <span class="status-badge" :data-status="residentStatus">{{ residentStatus === 'rejected' ? 'Changes requested' : statusLabels[residentStatus] }}</span>
-          </div>
-
-          <section v-if="residentSubmission?.review?.feedback" class="resident-feedback" :data-status="residentStatus">
-            <h3>Overseer feedback</h3>
-            <p>{{ residentSubmission.review.feedback }}</p>
-          </section>
-
-          <div class="photo-grid resident-photos">
-            <figure>
-              <figcaption>Baseline photo</figcaption>
-              <EvidencePhoto :photo="residentChore.baseline" />
-            </figure>
-            <figure v-if="residentPhoto">
-              <figcaption>{{ chosenPhoto ? 'Photo preview' : 'Your last submission' }}</figcaption>
-              <EvidencePhoto :photo="residentPhoto" />
-            </figure>
-          </div>
-
-          <section class="criteria-card" aria-label="Completion criteria">
-            <span class="criteria-icon" aria-hidden="true"><span class="check-icon"></span></span>
-            <div><h3>Completion criteria</h3><p>{{ residentChore.criteria }}</p></div>
-          </section>
-
-          <form v-if="canSubmit" class="upload-form" @submit.prevent="sendPhoto">
-            <h3>{{ residentStatus === 'rejected' ? 'Resubmit a photo' : 'Submit a photo' }}</h3>
-            <p>{{ residentChore.photoInstructions }}</p>
-            <input ref="fileInput" type="file" class="visually-hidden" tabindex="-1" accept="image/jpeg,image/png,image/webp" aria-label="Chore photo" @change="chooseFile" />
-            <p v-if="fileProblem" class="field-error" role="alert">{{ fileProblem }}</p>
-            <p v-if="chosenPhoto" class="file-name">{{ chosenPhoto.name }}</p>
-            <div class="upload-actions">
-              <button type="button" class="button button-secondary" @click="fileInput?.click()">{{ chosenPhoto ? 'Change photo' : 'Choose photo' }}</button>
-              <button type="button" class="button button-link" @click="useSample">Use sample photo</button>
-              <button type="submit" class="button button-primary" :disabled="!chosenPhoto">Submit for review</button>
-            </div>
-          </form>
-          <div v-else class="resident-result">
-            {{ residentStatus === 'approved' ? 'This chore is complete.' : 'Your photo is waiting for Overseer review.' }}
-          </div>
-        </article>
-
-        <aside class="panel history-panel" aria-labelledby="history-heading">
-          <h2 id="history-heading">Submission history</h2>
-          <ol v-if="residentAttempts.length" class="history-list">
-            <li v-for="attempt in residentAttempts.toReversed()" :key="attempt.id">
-              <span class="status-badge" :data-status="statusOf(attempt)">{{ statusLabels[statusOf(attempt)] }}</span>
-              <time :datetime="attempt.submittedAt.toISOString()">{{ dateTime.format(attempt.submittedAt) }}</time>
-              <p v-if="attempt.review?.feedback">{{ attempt.review.feedback }}</p>
-            </li>
-          </ol>
-          <p v-else class="queue-empty">No photos submitted yet.</p>
-        </aside>
-      </div>
-      <footer class="workspace-footer">Sample data resets when you refresh.</footer>
     </main>
+    <ResidentApp v-else />
   </template>
 </template>

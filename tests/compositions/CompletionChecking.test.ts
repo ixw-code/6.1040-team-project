@@ -1,3 +1,6 @@
+import { createGateway } from "@mit-sdg/sync-engine/boundary";
+import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
+import { policy } from "../../src/http.ts";
 import { describe, expect, test } from "bun:test";
 import { assembleApplication } from "../../src/assembly.ts";
 import {
@@ -242,5 +245,64 @@ describe("CompletionChecking HTTP", () => {
     const { post } = requests(createCompletionHandler(application.concepts, createPhotoStore(database())));
     expect(await post("get", { task: sinkTask })).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
     expect(await post("get", { task: sinkTask }, cookie)).toEqual({ status: 503, body: { error: "UNAVAILABLE" } });
+  });
+});
+
+describe("Production completion", () => {
+  const database = useMongoTestDb("completion_live");
+
+  test("records an approved upload against the scheduled task and credits it once", async () => {
+    const { createCompletionHooks } = await import("../../src/compositions/CompletionChecking.ts");
+    const application = assembleApplication(database);
+    const { ChoreCataloguing, TaskScheduling, Ranking, Sessioning } = application.concepts;
+    const { session, accountRequest } = accountRequests(application);
+    const handle = createHttpHandler({ application, gateway: createGateway({ application }), policy });
+    async function call(path: string, input: object, cookie: string) {
+      const response = await handle(new Request(url + "/api" + path, {
+        method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }));
+      expect(response.status).toBe(200);
+      return response.json();
+    }
+    const owner = await session("register", "live-owner");
+    const resident = await session("register", "live-resident");
+    const login = await session("login", "live-owner");
+    expect((await accountRequest("me", {}, login.cookie)).status).toBe(200);
+    const { household } = await call("/households/create", { name: "Home" }, owner.cookie);
+    await call("/households/residents/add", { household, person: resident.user }, owner.cookie);
+    const { category } = await call("/households/categories/add", { household, name: "Kitchen" }, owner.cookie);
+    await call("/households/preferences/set", {
+      household, person: resident.user, category, preferenceLevel: "PREFER",
+    }, resident.cookie);
+    const createdChore = await ChoreCataloguing.create({
+      group: household, category, name: "Sink", difficulty: 2, description: "Show the sink",
+      requirements: ["Empty the sink"], references: [],
+    });
+    if ("error" in createdChore) throw new Error(createdChore.error);
+    const { chore } = createdChore;
+    const start = new Date(Date.now() - 60_000).toISOString();
+    const end = new Date(Date.now() + 60_000).toISOString();
+    const { task } = await call("/assignments/tasks/create", { household, chore, interval: { start, end } }, owner.cookie);
+    await call("/assignments/availability/add", { household, person: resident.user, start, end }, resident.cookie);
+    const scheduling = await call("/assignments/auto-schedule", {
+      household, from: start, until: end, onlyUnassigned: true,
+    }, owner.cookie);
+    expect(scheduling.scheduled).toEqual([{ task, person: resident.user }]);
+    const photos = createPhotoStore(database());
+    const upload = await createPhotoHandler(photos, Sessioning)(new Request(url + "/api/photos", {
+      method: "POST", headers: { Cookie: resident.cookie, "Content-Type": "image/png" }, body: png,
+    }));
+    expect(upload.status).toBe(201);
+    const { photo } = await upload.json();
+    const { post } = requests(createCompletionHandler(application.concepts, photos, createCompletionHooks(application.concepts)));
+    const result = await post("submit", { task, photo }, resident.cookie);
+    expect(result.status).toBe(200);
+    const review = { submission: result.body.submission, decision: "APPROVE" };
+    expect(await post("review", review, resident.cookie)).toEqual(notFound);
+    expect((await post("review", review, owner.cookie)).status).toBe(200);
+    expect((await post("review", review, owner.cookie)).status).toBe(200);
+    expect(await TaskScheduling._get({ task })).toMatchObject([{ completedBy: resident.user }]);
+    expect(await Ranking._score({ group: household, person: resident.user })).toEqual({ score: 1 });
   });
 });

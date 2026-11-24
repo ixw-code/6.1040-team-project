@@ -11,8 +11,12 @@ type Sessioning = ReturnType<typeof assembleApplication>["concepts"]["Sessioning
 import { assignmentHttpErrors } from "./compositions/ChoreAssignments.ts";
 import { householdHttpErrors } from "./compositions/HouseholdManagement.ts";
 
+const defaultPublicOrigin = process.env.NODE_ENV === "development"
+  ? "http://localhost:5173"
+  : "https://shift-happens.mit-sdg.dev/";
+
 export const policy = httpPolicy({
-  publicOrigin: process.env.PUBLIC_ORIGIN ?? "https://shift-happens.mit-sdg.dev/",
+  publicOrigin: process.env.PUBLIC_ORIGIN ?? defaultPublicOrigin,
   basePath: "/api",
   publicErrors: { ...accountsHttp.publicErrors, ...passwordsHttp.publicErrors, ...householdHttpErrors, ...assignmentHttpErrors },
   cookies: {

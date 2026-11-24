@@ -2,6 +2,9 @@ import { fileURLToPath } from "node:url";
 import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vite";
 
+const backendPort = process.env.PORT ?? "3000";
+const backend = `http://127.0.0.1:${backendPort}`;
+
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [vue()],
@@ -10,8 +13,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      "/api": "http://127.0.0.1:3000",
-      "/health": "http://127.0.0.1:3000",
+      "/api": backend,
+      "/health": backend,
     },
   },
 });
