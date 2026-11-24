@@ -6,13 +6,13 @@ export function useMongoTestDb(name: string): () => Db {
   let db: Db | undefined;
 
   beforeAll(async () => {
-    const url = process.env.MONGODB_URL;
-    if (!url) throw new Error("Set MONGODB_URL to run the MongoDB tests.");
+    const url = process.env.MONGODB_URI;
+    if (!url) throw new Error("Set MONGODB_URI to run the MongoDB tests.");
     client = new MongoClient(url, { serverSelectionTimeoutMS: 3000 });
     try {
       await client.connect();
     } catch (error) {
-      throw new Error("MongoDB test connection failed. Check MONGODB_URL and run `bun run db:up`.", {
+      throw new Error("MongoDB test connection failed. Check MONGODB_URI and run `bun run db:up`.", {
         cause: error,
       });
     }

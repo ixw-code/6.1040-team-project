@@ -68,7 +68,7 @@ The overseer can manually assign, reassign, or unassign residents for incomplete
 
 The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) verifies their permission, while `HouseholdManaging._allResidents` checks the supplied assignees as a set. `TaskScheduling.setSchedule` verifies that each task belongs to the household and is incomplete as part of the atomic batch. Omit the assignee to unassign a task.
 
-Requests are refused with `NOT_FOUND`, `TASK_STATUS_CONFLICT`, `TASK_INTERVAL_INVALID`, `SCHEDULE_ENTRIES_INVALID`, or `PERSON_NOT_AVAILABLE`, as applicable. The entire batch is refused without partial changes. Unauthorized requests return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
+Requests for missing assignees are refused with `NOT_FOUND`. A missing or out-of-household task is refused by TaskScheduling with `TASK_NOT_FOUND`, which maps to HTTP 404. Other requests are refused with `TASK_STATUS_CONFLICT`, `TASK_INTERVAL_INVALID`, `SCHEDULE_ENTRIES_INVALID`, or `PERSON_NOT_AVAILABLE`, as applicable. The entire batch is refused without partial changes. Unauthorized requests return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
 
 ```endpoints
 ChoreAssignments.SetSchedule at /assignments/set

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { assembleApplication } from "../../src/assembly.ts";
-import { RankingConcept } from "../../src/concepts/Ranking.ts";
+import { RankingConcept } from "../../src/concepts/Ranking/Ranking.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";
 
 describe("Ranking", () => {

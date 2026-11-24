@@ -1,8 +1,9 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { createGateway } from "@mit-sdg/sync-engine/boundary";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { assembleApplication } from "../../src/assembly.ts";
 import { policy } from "../../src/http.ts";
+import { TaskSchedulingConcept } from "../../src/concepts/TaskScheduling/TaskScheduling.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";
 
 const database = useMongoTestDb("chore_assignments");
@@ -18,7 +19,6 @@ async function setup() {
       method: "POST", headers: { "Content-Type": "application/json", ...(cookie && { Cookie: cookie }) },
       body: JSON.stringify(body),
     }));
-    if (response.status === 500) throw new Error(`Unexpected server failure for ${path}: ${await response.text()}`);
     return { status: response.status, body: await response.json(), cookie: response.headers.get("Set-Cookie")?.split(";")[0] };
   }
   async function register() {
@@ -143,6 +143,67 @@ describe("ChoreAssignments", () => {
     });
     expect((await request("swaps/propose", {}, resident.cookie)).status).toBe(404);
     expect(await application.concepts.TaskScheduling._tasks({ group: household })).toHaveLength(3);
+  });
+
+  test("runs the Alpha household-to-cleanup workflow using the signed-in session", async () => {
+    const { post, request, createTask, owner, resident, household, category, application } = await setup();
+    const target = { person: resident.person };
+    const window = { from: at(1), until: at(8) };
+    expect((await post("/households/preferences/set", {
+      household, ...target, category, preferenceLevel: "PREFER",
+    }, resident.cookie)).status).toBe(200);
+    expect((await post("/households/preferences/set", {
+      household, person: owner.person, category, preferenceLevel: "AVOID",
+    }, owner.cookie)).status).toBe(200);
+    for (const { person, cookie } of [owner, resident]) {
+      expect((await request("availability/add", { person, ...interval(1, 8) }, cookie)).status).toBe(200);
+    }
+
+    const task = await createTask({ interval: interval(2, 3) });
+    expect(await request("auto-schedule", { ...window, onlyUnassigned: true }, owner.cookie)).toMatchObject({
+      status: 200, body: { scheduled: [{ task, ...target }] },
+    });
+    expect((await request("set", { entries: [{ task, assignee: owner.person }] }, owner.cookie)).status).toBe(200);
+    expect(await request("schedule", window, resident.cookie)).toMatchObject({
+      status: 200, body: { tasks: [{ task, assignee: owner.person, source: "MANUAL" }] },
+    });
+    expect((await request("set", { entries: [{ task, assignee: resident.person }] }, owner.cookie)).status).toBe(200);
+    expect(await request("mine", window, resident.cookie)).toMatchObject({ status: 200, body: { tasks: [{ task }] } });
+
+    expect((await post("/households/residents/remove", { household, ...target }, owner.cookie)).status).toBe(200);
+    await application.whenIdle();
+    expect(await request("schedule", window, owner.cookie)).toMatchObject({
+      status: 200, body: { tasks: [{ task, assignee: null, source: null }] },
+    });
+    expect((await request("schedule", window, resident.cookie)).status).toBe(403);
+    expect(await application.concepts.TaskScheduling._availability({ group: household, ...target })).toEqual([]);
+    expect(await application.concepts.TaskScheduling._workload({ group: household, ...target })).toEqual({ workload: 0 });
+  });
+
+  test("can retry scheduling cleanup after a failed reaction without restoring the residency", async () => {
+    const cleanup = spyOn(TaskSchedulingConcept.prototype, "removePerson").mockImplementationOnce(async () => {
+      throw new Error("Injected cleanup write failure");
+    });
+    try {
+      const { request, post, createTask, owner, resident, household, application } = await setup();
+      const target = { person: resident.person };
+      expect((await request("availability/add", { ...target, ...interval(1, 8) }, owner.cookie)).status).toBe(200);
+      const task = await createTask({ interval: interval(2, 3) });
+      expect((await request("set", { entries: [{ task, assignee: resident.person }] }, owner.cookie)).status).toBe(200);
+      const removal = await post("/households/residents/remove", { household, ...target }, owner.cookie);
+      await application.whenIdle();
+      expect(removal).toMatchObject({ status: 500, body: { error: "INTERNAL_ERROR" } });
+      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(await application.concepts.HouseholdManaging._residents({ household })).toEqual([{ person: owner.person }]);
+      expect(await application.concepts.TaskScheduling._availability({ group: household, ...target })).toHaveLength(1);
+      expect(await request("residents/cleanup", target, owner.cookie)).toMatchObject({
+        status: 200, body: { freed: [{ task }] },
+      });
+      expect(await application.concepts.TaskScheduling._availability({ group: household, ...target })).toEqual([]);
+      expect(await application.concepts.TaskScheduling._workload({ group: household, ...target })).toEqual({ workload: 0 });
+    } finally {
+      cleanup.mockRestore();
+    }
   });
 
   test("cleans up after successful resident removal and supports safe, repeatable retry", async () => {

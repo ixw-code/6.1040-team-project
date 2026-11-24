@@ -14,7 +14,7 @@ The week's jobs are added: Monday's sink (weight 1), Tuesday's bathroom (weight 
 
 The planner tries to set Saturday's trash to Caleb, but it is refused because Caleb is not available on weekends. Instead, the planner takes the schedule, moves Tuesday's bathroom from Allie to Caleb, and sets it again. Auto-scheduling once more only fills empty jobs, so Caleb keeps the bathroom.
 
-Later, Millie removes her Saturday availability. The trash goes back to being unscheduled, so it never stays with someone who can't do it. If Caleb's Saturday is available, he can self-assign himself, or the overseer can assign someone to do it too. When new residents are added to the household, the auto-scheduler will assign tasks for subsequent weeks accordingly. 
+Later, Millie removes her Saturday availability. The trash goes back to being unscheduled, so it never stays with someone who can't do it. If Caleb is available on Saturday, the planner can assign him the trash task. When new residents are added to the household, the auto-scheduler will assign tasks for subsequent weeks accordingly.
 
 The task scheduler records tasks and their status, whether a task is still pending or if it has been completed and by whom and when.
 

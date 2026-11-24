@@ -20,7 +20,7 @@ The overseer can add residents to their household. The [CanManageHousehold view]
 
 Residents can leave voluntarily, while the overseer can remove other residents. The [CanRemoveResident view](view:HouseholdManagement.CanRemoveResident) checks that the requester is the resident being removed or the household overseer. The [RemoveResident endpoint](reaction:HouseholdManagement.RemoveResident) invokes `HouseholdManaging.removeResident`.
 
-Successful removal returns the residency, household, and person. The [ResidentRemoved reaction](reaction:ChoreAssignments.ResidentRemoved) uses these results and invokes `TaskScheduling.removePerson` to clear the departing resident's availability and incomplete assignments. Completed task history is preserved. The overseer must transfer oversight before leaving.
+Successful removal returns the residency, household, and person. The [ResidentRemoved reaction](reaction:ChoreAssignments.ResidentRemoved) uses these results and invokes `TaskScheduling.removePerson` to clear the departing resident's availability and incomplete assignments. Completed task history is preserved. If scheduling cleanup faults, the request can return an internal error after removal has persisted. The overseer can retry through the [RetryResidentCleanup endpoint](reaction:ChoreAssignments.RetryResidentCleanup). The overseer must transfer oversight before leaving.
 
 Requests are refused with `NOT_FOUND` for nonexistent households or residents, `HOUSEHOLD_RESIDENT_CONFLICT` for duplicate residency, or `HOUSEHOLD_OVERSEER_CONFLICT` when removing the overseer. Unauthorized requests return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
 

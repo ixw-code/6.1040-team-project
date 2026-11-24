@@ -137,7 +137,7 @@ describe("HouseholdManaging", () => {
       second.removeResident({ household, person: "bob" }),
     ]);
     expect(transfer.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
-    const client = new MongoClient(process.env.MONGODB_URL!);
+    const client = new MongoClient(process.env.MONGODB_URI!);
     try {
       const reopened = new HouseholdManagingConcept(() => client.db(database().databaseName));
       expect(await reopened._categories({ household })).toHaveLength(2);

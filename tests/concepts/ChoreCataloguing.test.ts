@@ -35,7 +35,7 @@ describe("ChoreCataloguing", () => {
     expect(await concept.updateRequirements({ ...key, requirements: ["Use a cloth", "Use a cloth"] })).toEqual({ chore });
     expect(await concept.updateReferencePhotos({ ...key, references: [] })).toEqual({ chore });
 
-    const client = new MongoClient(process.env.MONGODB_URL!);
+    const client = new MongoClient(process.env.MONGODB_URI!);
     try {
       const reader = new ChoreCataloguingConcept(() => client.db(database().databaseName));
       expect(await reader._get({ chore })).toEqual([{

@@ -1561,6 +1561,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when RequestBoundary.request (household, path: "/assignments/residents/cleanup", person, requestId, session)
@@ -1573,6 +1574,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RetryResidentCleanup
@@ -1589,6 +1591,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when TaskScheduling.removePerson (group: household, person, freed), asked by ChoreAssignments.RetryResidentCleanup:cleaned#2
@@ -1603,6 +1606,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RetryResidentCleanup
@@ -1619,6 +1623,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RetryResidentCleanup
@@ -1634,6 +1639,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RetryResidentCleanup

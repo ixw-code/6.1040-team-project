@@ -13,8 +13,9 @@ cp .env.example .env
 ```
 
 Copy the environment file only on first setup; preserve an existing `.env`.
-It stays untracked. The example connects to the local `shift_happens` database
-using the development credentials from `compose.yaml`.
+It stays untracked. The example sets `MONGODB_URI` for the local `shift_happens` database
+using the development credentials from `compose.yaml`. If you already have
+a MongoDB connection setting, use the `MONGODB_URI` key and keep its value.
 
 On macOS, start the Podman machine after restarting your computer:
 
@@ -61,6 +62,7 @@ bun run dev:frontend
 
 ## Backend tests
 
-Run the backend tests with `bun test tests/` while MongoDB is running.
+Run the tests with `bun test` while MongoDB is running. The suite includes
+MongoDB-backed account and Alpha household-to-scheduling HTTP tests.
 The CompletionChecking tests supply temporary sessions, roles, and tasks. The application
 requires the team's implementations of those operations to serve authenticated requests.

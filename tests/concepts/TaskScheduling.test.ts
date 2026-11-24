@@ -44,6 +44,25 @@ describe("TaskScheduling task lifecycle", () => {
     expect(await concept._tasks({ group: input.group })).toEqual([]);
   });
 
+  test("allows only one of concurrent removal and completion to succeed", async () => {
+    const first = new TaskSchedulingConcept(database);
+    const second = new TaskSchedulingConcept(database);
+    const { task } = await first.add({ group: "completion-race", ...definition, deadline: at(8) });
+    const [removal, completion] = await Promise.allSettled([
+      first.remove({ task }),
+      second.complete({ task, completedBy: "alice", completedAt: at(7) }),
+    ]);
+    if (completion.status === "fulfilled") {
+      expect(removal.status).toBe("rejected");
+      if (removal.status === "rejected") expect(removal.reason).toBeInstanceOf(TaskStatusConflict);
+      expect(await first._get({ task })).toMatchObject([{ completedBy: "alice", completedAt: at(7) }]);
+    } else {
+      expect(completion.reason).toBeInstanceOf(TaskNotFound);
+      expect(removal.status).toBe("fulfilled");
+      expect(await first._get({ task })).toEqual([]);
+    }
+  });
+
   test("reads task windows and derives status with boundary and completion queries", async () => {
     const group = "status";
     const concept = new TaskSchedulingConcept(database, () => at(8));
@@ -192,7 +211,7 @@ describe("TaskScheduling automatic scheduling", () => {
     ]);
     expect(removal.status).toBe("fulfilled");
     if (assignment.status === "rejected") expect(assignment.reason).toBeInstanceOf(PersonNotAvailable);
-    const client = new MongoClient(process.env.MONGODB_URL!);
+    const client = new MongoClient(process.env.MONGODB_URI!);
     try {
       const reader = new TaskSchedulingConcept(() => client.db(database().databaseName));
       expect(await reader._availability({ group, person: "alice" })).toEqual([]);
