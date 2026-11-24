@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { assembleApplication } from "../../src/assembly.ts";
-import { AlreadyPending, AlreadyReviewed, PhotoCheckingConcept } from "../../src/concepts/PhotoChecking.ts";
+import { AlreadyPending, AlreadyReviewed, PhotoCheckingConcept } from "../../src/concepts/PhotoChecking/PhotoChecking.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";
 
 const evidence = {

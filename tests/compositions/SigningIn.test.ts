@@ -11,7 +11,7 @@ const otherPassword = "battery staple";
 function requests(application: ReturnType<typeof assembleApplication>) {
   const handler = createHttpHandler({ application, gateway: createGateway({ application }), policy });
   return async (path: string, input: object = {}, cookie?: string) => {
-    const response = await handler(new Request(`http://127.0.0.1/api/auth/${path}`, {
+    const response = await handler(new Request(`http://127.0.0.1/api/user/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
       body: JSON.stringify(input),

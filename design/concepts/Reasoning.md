@@ -6,6 +6,12 @@ Let people ask a reasoner a question that takes time to answer, and read the ans
 
 *Prevents:* someone abandons a question without saying why; someone reads an answer but can't see the question or what it was about; two reasoners answer the same question at once; someone deletes what they asked about, and the answers about it stay behind.
 
+Reused from conceptbox's reasoning concept
+
+The application uses a photo submission as Subject. The checking agent can record the complete model response with one extend action before concluding the prompt.
+
+The CompletionChecking composition interprets the answer and applies an approval or sends the submission to the Overseer.
+
 ## Principle
 
 Maya asks for a short description of her photo `beach.jpg`. A model takes the question and writes an answer a few words at a time, and Maya reads it as it grows: "Two people", " on a beach", " at sunset". The model concludes, and from then on Reasoning returns the finished answer with the question, the photo it was about, and the model that wrote it. When a second model tries to take the same question or add to the answer, it is refused. Later, Maya asks about another file while the model is unreachable; the program that runs the model abandons the question with the reason "The model could not be reached.", and Maya reads that reason instead of an answer. When she deletes `beach.jpg` for good, every question about it is forgotten, and Reasoning returns none of them.
@@ -151,11 +157,3 @@ _reason(prompt: Prompt) : optional (reason: String)
 _lines(prompt: Prompt) : many (line: String, position: Number)
   Returns the nonblank lines of a concluded prompt's answer, trimmed, in order, each with its position counting from 0, or no rows when the prompt isn't concluded.
 ```
-
-## Notes
-
-Reused from conceptbox's reasoning concept
-
-The application uses a photo submission as Subject. The checking agent can record the complete model response with one extend action before concluding the prompt.
-
-The CompletionChecking composition interprets the answer and applies an approval or sends the submission to the Overseer.

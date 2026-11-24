@@ -8,15 +8,19 @@ ChoreCataloguing stores reusable chores with their category, difficulty weight, 
 
 When a person becomes a resident of a household through `HouseholdManaging`, they are automatically eligible for automatic chore assignment. The household overseer is also a resident and is eligible for assignment. (Oversight currently handled by HouseholdManaging, while explicit eligibility policies and Roling concept is not yet supported).
 
-When a resident leaves the household or the overseer removes them, they also leave the schedule and their availability and any assigned incomplete tasks need to be cleared. The [ResidentRemoved reaction](reaction:ChoreAssignments.ResidentRemoved) reaction to a successful `HouseholdManaging.removeResident` by invoking `TaskScheduling.removePerson`. The latter clears the resident availability and their incomplete assignments, and returns the freed tasks; completed tasks remain in history. Scheduling can be rerun by the overseer on the freed tasks, or for the next week's assignments. Overseers must transfer their oversight before leaving the household.
+When a resident leaves the household or the overseer removes them, they also leave the schedule and their availability and any assigned incomplete tasks need to be cleared. The [ResidentRemoved reaction](reaction:ChoreAssignments.ResidentRemoved) reacts to a successful `HouseholdManaging.removeResident` by invoking `TaskScheduling.removePerson`. The latter clears the resident availability and their incomplete assignments, and returns the freed tasks; completed tasks remain in history. Scheduling can be rerun by the overseer on the freed tasks, or for the next week's assignments. Overseers must transfer their oversight before leaving the household.
 
-The composition handles permission checks and partial failures/retries between the two concepts.
+The reaction checks that the person is still absent from the household before clearing their schedule. If cleanup fails after the removal succeeds, the overseer can use the [RetryResidentCleanup endpoint](reaction:ChoreAssignments.RetryResidentCleanup) to retry. Repeating cleanup for a former resident is safe. Requests for a current resident are refused with `RESIDENT_STILL_PRESENT`.
+
+```endpoints
+ChoreAssignments.RetryResidentCleanup at /assignments/residents/cleanup
+```
 
 ## Setting availability
 
 A signed-in resident can [add](reaction:ChoreAssignments.AddAvailability) and [remove](reaction:ChoreAssignments.RemoveAvailability) their own availability windows through `TaskScheduling` and set preferences for categories of work in their household through `HouseholdManaging`. Removing availability causes TaskScheduling to clear incomplete assignments that are no longer valid. Completed tasks retain their assignment history. Requests are refused with `TASK_INTERVAL_INVALID` for invalid intervals or `NOT_FOUND` for nonexistent availability.
 
-The [can-edit-availability view](view:ChoreAssignments.CanEditAvailability) checks the resident's identity or session, so only the overseer or the resident themselves can change someone else's availability. Unauthorized requests are refused with `ACCESS_DENIED`; unauthenticated requests with `UNAUTHENTICATED`.
+The [can-edit-availability view](view:ChoreAssignments.CanEditAvailability) allows an overseer to edit any current resident's availability and allows residents to edit their own. Removal matches the supplied availability identity against the target resident's availability in that household. Unauthorized requests are refused with `ACCESS_DENIED`; unauthenticated requests with `UNAUTHENTICATED`.
 
 Residents without availability cannot be assigned automatically. The schedule page can warn residents and the overseer when availability is missing. (Through UI behavior, Notifying concept currently isn't supported).
 
@@ -29,9 +33,9 @@ ChoreAssignments.RemoveAvailability at /assignments/availability/remove
 
 Only the household overseer can create tasks for their household. The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) checks their authorization. The [ValidHouseholdChore view](view:ChoreAssignments.ValidHouseholdChore) checks that the selected chore belongs to the household and its category is valid, using `ChoreCataloguing._get` and `HouseholdManaging`.
 
-The [create-a-task endpoint](reaction:ChoreAssignments.CreateTask) coordinates the permission checks and invokes `TaskScheduling.add` with the chore's identity, category, difficulty weight, deadline, and optional interval. Later changes to the chore's weight or category in its definition in `ChoreCataloguing` do not change tasks already created. A resident's total reflects the weight each task had when it was created.
+The [create-a-task endpoint](reaction:ChoreAssignments.CreateTask) coordinates the permission checks and invokes `TaskScheduling.add` with the chore's identity, category, difficulty weight, and at least one of a deadline and interval. The endpoint reads category and difficulty from the catalogue rather than accepting them in the request. Omission or null clears timing on the respective update endpoint, subject to the task's timing invariants. Later changes to the chore's weight or category in its definition in `ChoreCataloguing` do not change tasks already created. A resident's total reflects the weight each task had when it was created.
 
-The overseer can also remove incomplete tasks or update their deadlines and scheduled intervals. The [AssignmentIsModifiable view](view:ChoreAssignments.AssignmentIsModifiable) checks that the task belongs to the household and is incomplete before allowing modification, and the endpoints use the corresponding `TaskScheduling` actions.
+The overseer can also [remove incomplete tasks](reaction:ChoreAssignments.RemoveTask), [update deadlines](reaction:ChoreAssignments.UpdateDeadline), or [update scheduled intervals](reaction:ChoreAssignments.UpdateInterval). The [AssignmentIsModifiable view](view:ChoreAssignments.AssignmentIsModifiable) checks that the task belongs to the household and is incomplete before allowing modification, and the endpoints use the corresponding `TaskScheduling` actions.
 
 Requests are refused with `TASK_WEIGHT_INVALID` for invalid weights, `TASK_INTERVAL_INVALID` for invalid timing, `NOT_FOUND` for nonexistent tasks, or `TASK_STATUS_CONFLICT` for modifications to completed tasks. Invalid chore references are refused with `NOT_FOUND`; unauthorized requests with `ACCESS_DENIED`, and unauthenticated requests with `UNAUTHENTICATED`.
 
@@ -44,11 +48,11 @@ ChoreAssignments.UpdateInterval at /assignments/tasks/interval
 
 ## Auto-scheduling
 
-Every Sunday night, the coming week is auto-scheduled for each household, so no one has to remember to do it. Scheduling gives each unassigned task to an available resident. The [WeeklyAutoSchedule endpoint](reaction:ChoreAssignments.WeeklyAutoSchedule) is triggered by an external scheduler and invokes `TaskScheduling.autoSchedule` with `onlyUnassigned = true`, preserving existing assignments.
+Every Sunday night, the coming week is auto-scheduled for each household, so no one has to remember to do it. Scheduling gives each unassigned task to an available resident. The [WeeklyAutoSchedule endpoint](reaction:ChoreAssignments.WeeklyAutoSchedule) is triggered by an external scheduler using a current overseer session. The external scheduler supplies the household and the UTC week boundaries and invokes `TaskScheduling.autoSchedule` with `onlyUnassigned = true`, preserving existing assignments.
 
 The overseer can also auto-schedule a manually selected period on demand. The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) verifies their permission. The [AutoSchedule endpoint](reaction:ChoreAssignments.AutoSchedule) invokes `TaskScheduling.autoSchedule` with the selected period and `onlyUnassigned` flag. When true, existing assignments are preserved; otherwise, automatic assignments are recalculated. Manual assignments and completed tasks always remain unchanged.
 
-Both endpoints use the [HouseholdPreferences former](former:ChoreAssignments.HouseholdPreferences), which assembles the household's residents and their category preferences from `HouseholdManaging`. Tasks without eligible assignees remain unassigned and are returned to the overseer for manual scheduling. Requests are refused with `SCHEDULE_WINDOW_INVALID` for invalid periods or `PREFERENCES_INVALID` for inconsistent preference inputs. Unauthorized requests are refused with `ACCESS_DENIED`; unauthenticated requests with `UNAUTHENTICATED`.
+Both endpoints use `HouseholdManaging._schedulingInputs` to read the candidates and their category preferences from one household snapshot. Tasks without eligible assignees remain unassigned and are returned to the overseer for manual scheduling. Requests are refused with `SCHEDULE_WINDOW_INVALID` for invalid periods or `PREFERENCES_INVALID` for inconsistent preference inputs. Unauthorized requests are refused with `ACCESS_DENIED`; unauthenticated requests with `UNAUTHENTICATED`.
 
 The overseer can also reset a selected period without immediately reassigning tasks. The [Reset endpoint](reaction:ChoreAssignments.Reset) checks CanManageSchedule and invokes `TaskScheduling.reset`, clearing only automatic assignments on incomplete tasks while preserving manual assignments and completed tasks.
 
@@ -62,9 +66,9 @@ ChoreAssignments.Reset at /assignments/reset
 
 The overseer can manually assign, reassign, or unassign residents for incomplete tasks that are scheduled over an interval. They retrieve the current schedule through the [HouseholdSchedule former](former:ChoreAssignments.HouseholdSchedule), edit or clear any assignments and submit changes all at once through the [SetSchedule endpoint](reaction:ChoreAssignments.SetSchedule).
 
-The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) verifies their permission, while the [AssignmentIsModifiable view](view:ChoreAssignments.AssignmentIsModifiable) verifies that each task belongs to the household and has not been completed.
+The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) verifies their permission, while `HouseholdManaging._allResidents` checks the supplied assignees as a set. `TaskScheduling.setSchedule` verifies that each task belongs to the household and is incomplete as part of the atomic batch. Omit the assignee to unassign a task.
 
-Requests are refused with `NOT_FOUND`, `TASK_STATUS_CONFLICT`, `TASK_INTERVAL_INVALID`, or `PERSON_NOT_AVAILABLE`, as applicable. The entire batch is refused without partial changes. Unauthorized requests return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
+Requests for missing assignees are refused with `NOT_FOUND`. A missing or out-of-household task is refused by TaskScheduling with `TASK_NOT_FOUND`, which maps to HTTP 404. Other requests are refused with `TASK_STATUS_CONFLICT`, `TASK_INTERVAL_INVALID`, `SCHEDULE_ENTRIES_INVALID`, or `PERSON_NOT_AVAILABLE`, as applicable. The entire batch is refused without partial changes. Unauthorized requests return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
 
 ```endpoints
 ChoreAssignments.SetSchedule at /assignments/set
@@ -72,29 +76,19 @@ ChoreAssignments.SetSchedule at /assignments/set
 
 ## Swapping assignments (WIP)
 
-A resident can propose swapping one of their incomplete assigned tasks with another resident's incomplete assigned task. The [CanProposeSwap view](view:ChoreAssignments.CanProposeSwap) checks that both tasks belong to the household, have scheduled intervals, and are assigned to the proposing resident and the intended recipient respectively.
+A resident could propose swapping one of their incomplete assigned tasks with another resident's incomplete assigned task. The offer would identify both tasks and their current assignees. Only the intended recipient could respond. Acceptance would use a single `TaskScheduling.setSchedule` batch to exchange assignees, after verifying that both tasks remain assigned as expected and both residents remain eligible.
 
-The [ProposeSwap endpoint](reaction:ChoreAssignments.ProposeSwap) records an offer for the other resident to accept or reject. The [RespondToSwap endpoint](reaction:ChoreAssignments.RespondToSwap) allows only that resident to respond. On acceptance, the [SwapAccepted reaction](reaction:ChoreAssignments.SwapAccepted) invokes `TaskScheduling.setSchedule` with both assignees exchanged. Both residents must be available for their new tasks; successful assignments receive source `MANUAL`.
-
-Requests are refused if either task is nonexistent, completed, unassigned, or no longer assigned to the expected resident, or if either resident is unavailable for the new interval. No assignment changes on rejection or a failed swap. Unauthorized requests return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
-
-(TBA: persistent offers, acceptance, and rejection require a Trading concept for managing state)
-
-```endpoints
-ChoreAssignments.ProposeSwap at /assignments/swaps/propose
-ChoreAssignments.RespondToSwap at /assignments/swaps/respond
-ChoreAssignments.CancelSwap at /assignments/swaps/cancel
-```
+Persistent offers, acceptance, rejection, and cancellation require Trading. Swap endpoints are deferred.
 
 ## Reading the schedule
 
-Signed-in residents see the whole household's schedule through the [GetSchedule endpoint](reaction:ChoreAssignments.GetSchedule). It uses a [HouseholdSchedule former](former:ChoreAssignments.HouseholdSchedule) combining `TaskScheduling._schedule` with chore details from `ChoreCataloguing` and category information from `HouseholdManaging`, returning each task's chore, deadline, scheduled interval, assignee, assignment source (`AUTO` or `MANUAL`), and completion status. A [CanReadSchedule view](view:ChoreAssignments.CanReadSchedule) verifies household membership. Requests from non-residents for another household's schedule return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
+Signed-in residents see the whole household's schedule through the [GetSchedule endpoint](reaction:ChoreAssignments.GetSchedule). It uses a [HouseholdSchedule former](former:ChoreAssignments.HouseholdSchedule) combining `TaskScheduling._schedule` with chore details from `ChoreCataloguing` and category information from `HouseholdManaging`, returning each task's chore, deadline, scheduled interval, assignee, assignment source (`AUTO` or `MANUAL`), and completion status. The [ScheduleTaskDetails former](former:ChoreAssignments.ScheduleTaskDetails) preserves the task's category and weight snapshot and uses the [ChoreDetails former](former:ChoreAssignments.ChoreDetails) for current catalogue details. A missing catalogue entry or category name does not hide the task. A [CanReadSchedule view](view:ChoreAssignments.CanReadSchedule) verifies household membership. Requests from non-residents for another household's schedule return `ACCESS_DENIED`; unauthenticated requests return `UNAUTHENTICATED`.
 
-Residents can also see their own tasks through the [MyTasks endpoint](reaction:ChoreAssignments.GetMyTasks). It uses a [MyTasks former](former:ChoreAssignments.MyTasks) to retrieve a filterable task list of either tasks assigned to or completed by the requesting resident.
+Residents can also see their own tasks through the [MyTasks endpoint](reaction:ChoreAssignments.GetMyTasks). It uses a [MyTasks former](former:ChoreAssignments.MyTasks) to retrieve tasks assigned to or completed by the requesting resident. The [PersonalTaskMatches view](view:ChoreAssignments.PersonalTaskMatches) selects assigned tasks, completed tasks, or both using the optional mode. Queries use a supplied UTC window and return `SCHEDULE_WINDOW_INVALID` if the start is not before the end.
 
-The overseer can view every resident's workload, availability, and category preferences through the [GetHouseholdOverview endpoint](reaction:ChoreAssignments.GetHouseholdOverview). The [HouseholdOverview former](former:ChoreAssignments.HouseholdOverview) combines the resident list and preferences from `HouseholdManaging` with each resident's workload and availability from `TaskScheduling._workloads` and `TaskScheduling._availability`. The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) verifies overseer authorization.
+The overseer can view every resident's workload, availability, and category preferences through the [GetHouseholdOverview endpoint](reaction:ChoreAssignments.GetHouseholdOverview). The [HouseholdOverview former](former:ChoreAssignments.HouseholdOverview) combines the resident list and preferences from `HouseholdManaging` with each resident's workload and availability from `TaskScheduling._workload` and `TaskScheduling._availability`. The [ResidentWorkload former](former:ChoreAssignments.ResidentWorkload), [PersonAvailability former](former:ChoreAssignments.PersonAvailability), and [HouseholdPreferences former](former:ChoreAssignments.HouseholdPreferences) supply these fields for each resident. The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) verifies overseer authorization.
 
-Residents can see their own [availability](reaction:ChoreAssignments.GetAvailability) and [total](reaction:ChoreAssignments.GetTotal) workload, but not those of other residents. Residents and the overseer are authorized for this through the [CanReadHouseholdDetails view](view:ChoreAssignments.CanReadHouseholdDetails).
+Residents can see their own [availability](reaction:ChoreAssignments.GetAvailability) and [total](reaction:ChoreAssignments.GetTotal) workload. The overseer can read these for any current resident through the [CanReadHouseholdDetails view](view:ChoreAssignments.CanReadHouseholdDetails).
 
 Requests are refused with `NOT_FOUND` when the household, task, or requested resident does not exist, `ACCESS_DENIED` when the requester lacks permission to access the information, or `UNAUTHENTICATED` when the requester is not signed in.
 
@@ -108,9 +102,24 @@ ChoreAssignments.GetHouseholdOverview at /assignments/overview
 
 ## Notes
 ### Assumptions
-The composition assumes that all household residents, including the overseer, are eligible for assignment. HouseholdManaging owns membership, oversight, and preferences, while TaskScheduling owns availability, assignments, and completion state. Authorization is checked by the composition.
+The composition assumes that all household residents, including the overseer, are eligible for assignment. HouseholdManaging owns membership, oversight, and preferences, while TaskScheduling owns availability, assignments, and completion state. Authorization is checked by the composition using `Sessioning.use` on the existing session cookie. Signed-out requests use the shared `NOT_SIGNED_IN` refusal for the unauthenticated case. The HTTP policy maps it to 401 and preserves the standard HTTP categories for the other domain refusals.
 
-We also assume that tasks are created manually for a given week by the overseer prior to assignment. 
+We also assume that tasks are created manually for a given week by the overseer prior to assignment. Timing inputs use UTC ISO timestamps and intervals use start and end. The request flow supplies the clock for display status.
+
+```computations
+assignmentDate(value: String) : DateTime
+  Converts a validated UTC timestamp to a date, or maps null to an absent optional date.
+assignmentInterval(value: IntervalInput) : Interval
+  Converts the two validated UTC timestamps, or maps null to an absent optional interval.
+assignmentPeople(entries: ScheduleEntries) : People
+  Returns the distinct assignees supplied in the batch.
+matchesPersonalTask(person: String, assignee?: String, completedBy?: String, mode: String) : TaskMatch
+  Reports whether the resident matches the assignment or completion filter.
+assignmentStatus(deadline?: DateTime, interval?: Interval, completedAt?: DateTime, asOf: DateTime) : String
+  Derives the task status using the same cutoff as TaskScheduling.
+assignmentIsIncomplete(completedAt?: DateTime) : IncompleteMatch
+  Reports whether the task has no completion timestamp.
+```
 
 Alpha supports the join/leave, availability-setting, task creation, weekly and manual scheduling, and schedule reading behavior for the current ChoreAssignment app. Swapping between two parties can be coordinated primitively, ie external to the app and overseers manually reassign them.
 

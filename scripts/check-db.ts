@@ -1,8 +1,8 @@
 import { MongoClient } from "mongodb";
 
-const url = process.env.MONGODB_URL;
+const url = process.env.MONGODB_URI;
 if (!url) {
-  throw new Error("MONGODB_URL is not set. Copy .env.example to .env first.");
+  throw new Error("MONGODB_URI is not set. Copy .env.example to .env first.");
 }
 
 const timeout = process.argv.includes("--wait") ? 30_000 : 3000;

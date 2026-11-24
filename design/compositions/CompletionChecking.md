@@ -8,6 +8,8 @@ PhotoChecking stores submissions and decisions. TaskTracking records task comple
 
 A signed-in resident can submit evidence for an active task assigned to them in their household. The submission endpoint checks the session and assignment before recording the photo. The session identifies the submitter, so a resident cannot submit under another person’s identity.
 
+The resident uploads the image first and receives a photo ID. Submitting that ID attaches the stored image to the task after CompletionChecking verifies that the signed-in resident uploaded it.
+
 The resident opens the task to see its completion criteria, photo instructions, and baseline image. Submitting records the photo, submission time, a saved copy of the criteria, and baseline for that attempt. Later changes to the task’s instructions do not change how an existing submission is reviewed.
 
 A new submission starts as pending. Submitting a photo does not mark the task complete or award a point. A task with a pending or approved submission cannot receive another submission. If a submission is rejected, the resident can address the reason and submit another attempt.
@@ -23,6 +25,8 @@ The completion endpoint checks access before returning the task and its submissi
 Submission time and review time remain separate. A resident who submitted before the deadline can show that even if the Overseer reviews it afterward.
 
 Unauthorized requests return `NOT_FOUND` without revealing another household’s tasks or photos.
+
+The image route takes a submission ID and checks the submission's household before returning the original image. The submitting resident and the household's Overseer can open the image through this route.
 
 ## Approving or rejecting a submission
 
@@ -42,16 +46,17 @@ Once the hook confirms task completion, Ranking credits the submitting resident 
 
 ## Manual API
 
-All four endpoints accept JSON via `POST`.
+CompletionChecking uses the login cookie to identify the caller. `POST` routes accept JSON.
 
-| Path | Fields |
-| --- | --- |
-| `/api/completion/submit` | `session`, `task`, `photo` |
-| `/api/completion/get` | `session`, `task` |
-| `/api/completion/review` | `session`, `submission`, `decision`, optional `feedback` |
-| `/api/completion/review-queue` | `session`, `household` |
+| Method | Path | Fields |
+| --- | --- | --- |
+| `POST` | `/api/completion/submit` | `task`, uploaded `photo` ID |
+| `POST` | `/api/completion/get` | `task` |
+| `POST` | `/api/completion/review` | `submission`, `decision`, optional `feedback` |
+| `POST` | `/api/completion/review-queue` | `household` |
+| `GET` | `/api/completion/submissions/:submission/photo` | `submission` in the path |
 
-CompletionChecking resolves the caller's session on the server and uses team-provided hooks for roles, task details, and completion. The application returns `UNAUTHORIZED` until those hooks are connected. The automated tests supply temporary data for these dependencies.
+The application returns `UNAVAILABLE` to signed-in callers until the team hooks for roles, task details, and completion are connected. The automated tests use real sessions and stored images with fixtures for those hooks.
 
 ## Choosing AI review - Beta
 

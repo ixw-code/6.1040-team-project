@@ -1,5 +1,5 @@
 AGENTS.md
-.agents/**
+/.agents/
 node_modules/
 *.tsbuildinfo
 *.log
