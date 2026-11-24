@@ -103,7 +103,7 @@ export class HouseholdManagingConcept {
     });
   }
 
-  async removeResident({ household, person }: HouseholdRef & PersonRef): Promise<{ residency: string }> {
+  async removeResident({ household, person }: HouseholdRef & PersonRef): Promise<HouseholdRef & PersonRef & { residency: string }> {
     return this.#update(household, (state) => {
       const index = state.residents.findIndex((resident) => resident.person === person);
       if (index === -1) throw new HouseholdResidentNotFound("This person does not belong to the household.");
@@ -216,7 +216,7 @@ export class HouseholdManagingConcept {
     }));
   }
 
-  async _categories({ household }: HouseholdRef): Promise<CategoryRef[]> {
+  async _categories({ household }: HouseholdRef): Promise<Category[]> {
     const state = await this.#households().findOne({ _id: household });
     return state?.categories.sort(byCategoryName).map(({ category, name }) => ({ category, name })) ?? [];
   }

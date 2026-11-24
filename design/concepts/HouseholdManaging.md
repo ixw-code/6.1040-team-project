@@ -175,7 +175,10 @@ setPreference(household: Household, person: Person, category: Category, preferen
   where category does not belong to household
   then
     refuses CATEGORY_NOT_FOUND "This category does not belong to the household."
-  where person is a resident and category belongs to household
+  where preferenceLevel is invalid
+  then
+    refuses PREFERENCE_LEVEL_INVALID "Preference level must be PREFER, NEUTRAL, or AVOID."
+  where person is a resident, category belongs to household, and preferenceLevel is valid
   then
     update the residency's preference level for category
     returns preference

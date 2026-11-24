@@ -303,6 +303,9 @@ _completedInInterval(group: Group, from: DateTime, until: DateTime) : many (task
 _availability(group: Group, person: Person) : many (availability: Availability, interval: Interval)
   Returns the person's availabilities, ordered by earliest start then availability identity. Returns no rows when none match.
 
+_hasAvailability(group: Group) : one (available: Flag)
+  Returns whether any availability remains in the group, or false if the group has none.
+
 _workload(group: Group, person: Person) : one (workload: Number)
   Returns the calculated total assigned workload of a person in the group, or zero when no tasks are assigned.
 ```

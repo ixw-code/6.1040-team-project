@@ -5,6 +5,7 @@ import type { applicationConceptSet as ApplicationConceptSet } from "../src/conc
 
 type AtPath<T, P extends readonly string[]> = P extends readonly [infer H extends string, ...infer R extends string[]] ? H extends keyof T ? AtPath<T[H], R> : H extends `${number}` ? T extends readonly (infer Item)[] ? AtPath<Item, R> : never : never : T;
 type QueryRow<T> = T extends readonly (infer Row)[] ? Row : T;
+type AllOf<T extends readonly unknown[]> = T extends readonly [infer Head, ...infer Rest] ? Head & AllOf<Rest> : unknown;
 type OneOf<T extends readonly unknown[]> = T[number];
 type Jsonify<T> = T extends Date ? string : T extends null | boolean | number | string ? T : T extends (...args: never[]) => unknown ? never : T extends readonly (infer Item)[] ? Jsonify<Item>[] : T extends object ? { [K in keyof T]: Jsonify<T[K]> } : never;
 
@@ -13,6 +14,193 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 export type AppWideError = never;
 
 export type ShiftHappensWire = {
+  "/households/categories": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "categories": {
+        "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>>;
+        "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/categories/add": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addCategory"]>[0], ["household"]>]>>;
+      "name": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addCategory"]>[0], ["name"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "category": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addCategory"]>>, ["category"]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "CATEGORY_NAME_CONFLICT" | "CATEGORY_NAME_INVALID" | "HOUSEHOLD_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/categories/remove": {
+    input: {
+      "category": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>>, ["category"]>]>]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>[0], ["household"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>>, ["category"]>]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "CATEGORY_IN_USE" | "CATEGORY_NOT_FOUND" | "HOUSEHOLD_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/categories/rename": {
+    input: {
+      "category": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>>, ["category"]>]>]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>[0], ["household"]>]>>;
+      "name": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>[0], ["name"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>>, ["category"]>]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "CATEGORY_NAME_CONFLICT" | "CATEGORY_NAME_INVALID" | "CATEGORY_NOT_FOUND" | "HOUSEHOLD_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/create": {
+    input: {
+      "name": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["create"]>[0], ["name"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "household": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["create"]>>, ["household"]>>;
+    };
+    error: { error: AppWideError | "HOUSEHOLD_NAME_INVALID" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+  };
+  "/households/get": {
+    input: {
+      "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "household": {
+        "categories": {
+          "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>>;
+          "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>>;
+        }[];
+        "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>]>>;
+        "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>>>, ["name"]>>;
+        "overseer": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>>>, ["overseer"]>>;
+        "residents": {
+          "person": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>>;
+        }[];
+      };
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/mine": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "households": {
+        "categories": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_householdsByPerson"]>>>, ["categories"]>>;
+        "household": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_householdsByPerson"]>>>, ["household"]>>;
+        "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_householdsByPerson"]>>>, ["name"]>>;
+        "overseer": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_householdsByPerson"]>>>, ["overseer"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+  };
+  "/households/overseer": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>>, ["household"]>]>]>>;
+      "person": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>[0], ["person"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>>, ["household"]>]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "HOUSEHOLD_NOT_FOUND" | "HOUSEHOLD_RESIDENT_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/preferences": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>]>>;
+      "person": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "preferences": {
+        "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_preferences"]>>>, ["category"]>>;
+        "preferenceLevel": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_preferences"]>>>, ["preferenceLevel"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/preferences/set": {
+    input: {
+      "category": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>[0], ["category"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>]>>;
+      "person": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>[0], ["person"]>]>>;
+      "preferenceLevel": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>[0], ["preferenceLevel"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "preference": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>>, ["preference"]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "CATEGORY_NOT_FOUND" | "HOUSEHOLD_RESIDENT_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "PREFERENCE_LEVEL_INVALID" };
+  };
+  "/households/remove": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["remove"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["remove"]>>, ["household"]>]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["remove"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["remove"]>>, ["household"]>]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "HOUSEHOLD_IN_USE" | "HOUSEHOLD_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/rename": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>>, ["household"]>]>]>>;
+      "name": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>[0], ["name"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>>, ["household"]>]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "HOUSEHOLD_NAME_INVALID" | "HOUSEHOLD_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/residents": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "residents": {
+        "person": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/residents/add": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addResident"]>[0], ["household"]>]>>;
+      "person": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addResident"]>[0], ["person"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Registering"]["_username"]>[0], ["user"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "residency": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addResident"]>>, ["residency"]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "HOUSEHOLD_NOT_FOUND" | "HOUSEHOLD_RESIDENT_CONFLICT" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/households/residents/remove": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["household"]>]>]>>;
+      "person": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>[0], ["person"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["person"]>]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["household"]>]>>;
+      "person": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>[0], ["person"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["person"]>]>>;
+      "residency": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["residency"]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "HOUSEHOLD_NOT_FOUND" | "HOUSEHOLD_OVERSEER_CONFLICT" | "HOUSEHOLD_RESIDENT_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
   "/user/login": {
     input: {
       "password": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Authenticating"]["authenticate"]>[0], ["password"]>>;
@@ -58,6 +246,177 @@ export type ShiftHappensWire = {
 export type HttpAppWideError = never;
 
 export type ShiftHappensWireHttp = {
+  "/households/categories": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>]>]>>;
+    };
+    output: {
+      "categories": {
+        "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>>;
+        "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>>;
+      }[];
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/categories/add": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addCategory"]>[0], ["household"]>]>>;
+      "name": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addCategory"]>[0], ["name"]>>;
+    };
+    output: {
+      "category": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addCategory"]>>, ["category"]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/categories/remove": {
+    input: {
+      "category": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>>, ["category"]>]>]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>[0], ["household"]>]>>;
+    };
+    output: {
+      "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeCategory"]>>, ["category"]>]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/categories/rename": {
+    input: {
+      "category": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>>, ["category"]>]>]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>[0], ["household"]>]>>;
+      "name": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>[0], ["name"]>>;
+    };
+    output: {
+      "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["renameCategory"]>>, ["category"]>]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/create": {
+    input: {
+      "name": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["create"]>[0], ["name"]>>;
+    };
+    output: {
+      "household": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["create"]>>, ["household"]>>;
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/households/get": {
+    input: {
+      "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
+    };
+    output: {
+      "household": {
+        "categories": {
+          "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>>;
+          "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>>;
+        }[];
+        "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>]>>;
+        "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>>>, ["name"]>>;
+        "overseer": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>>>, ["overseer"]>>;
+        "residents": {
+          "person": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>>;
+        }[];
+      };
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/mine": {
+    input: Record<string, never>;
+    output: {
+      "households": {
+        "categories": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_householdsByPerson"]>>>, ["categories"]>>;
+        "household": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_householdsByPerson"]>>>, ["household"]>>;
+        "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_householdsByPerson"]>>>, ["name"]>>;
+        "overseer": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_householdsByPerson"]>>>, ["overseer"]>>;
+      }[];
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/households/overseer": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>>, ["household"]>]>]>>;
+      "person": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>[0], ["person"]>]>>;
+    };
+    output: {
+      "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setOverseer"]>>, ["household"]>]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/preferences": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>]>>;
+      "person": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>>;
+    };
+    output: {
+      "preferences": {
+        "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_preferences"]>>>, ["category"]>>;
+        "preferenceLevel": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_preferences"]>>>, ["preferenceLevel"]>>;
+      }[];
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/preferences/set": {
+    input: {
+      "category": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>[0], ["category"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["category"]>]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>]>>;
+      "person": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>[0], ["person"]>]>>;
+      "preferenceLevel": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>[0], ["preferenceLevel"]>>;
+    };
+    output: {
+      "preference": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["setPreference"]>>, ["preference"]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/remove": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["remove"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["remove"]>>, ["household"]>]>]>>;
+    };
+    output: {
+      "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["remove"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["remove"]>>, ["household"]>]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/rename": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>>, ["household"]>]>]>>;
+      "name": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>[0], ["name"]>>;
+    };
+    output: {
+      "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["rename"]>>, ["household"]>]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/residents": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>]>>;
+    };
+    output: {
+      "residents": {
+        "person": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>>;
+      }[];
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/residents/add": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addResident"]>[0], ["household"]>]>>;
+      "person": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addResident"]>[0], ["person"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Registering"]["_username"]>[0], ["user"]>]>>;
+    };
+    output: {
+      "residency": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["addResident"]>>, ["residency"]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/households/residents/remove": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["household"]>]>]>>;
+      "person": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>[0], ["person"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["person"]>]>]>>;
+    };
+    output: {
+      "household": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>[0], ["household"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["household"]>]>>;
+      "person": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>[0], ["person"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["person"]>]>>;
+      "residency": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["removeResident"]>>, ["residency"]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
   "/user/login": {
     input: {
       "password": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Authenticating"]["authenticate"]>[0], ["password"]>>;

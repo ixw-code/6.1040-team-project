@@ -1,12 +1,6 @@
 # Shift Happens Application Types
 
 ```types
-concrete Household
-  A group whose residents share chores.
-
-concrete TaskOccurrence
-  A specific dated task that can earn contribution credit.
-
 concrete PhotoReference
   A reference to a submitted or baseline photo.
 

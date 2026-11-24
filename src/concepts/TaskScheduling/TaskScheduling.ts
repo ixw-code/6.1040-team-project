@@ -428,6 +428,13 @@ export class TaskSchedulingConcept {
       .map(({ availability, interval }) => ({ availability, interval }));
   }
 
+  async _hasAvailability({ group }: GroupRef): Promise<{ available: boolean }> {
+    const found = await this.#groups().findOne({ _id: group, "availabilities.0": { $exists: true } }, {
+      projection: { _id: 1 },
+    });
+    return { available: found !== null };
+  }
+
   async _workload({ group, person }: GroupRef & PersonRef): Promise<{ workload: number }> {
     return { workload: workloadByPerson(await this.#tasks(group)).get(person) ?? 0 };
   }

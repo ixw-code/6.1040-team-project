@@ -10,7 +10,8 @@ export default {
     version: 1,
     documents: [
       new URL("./design/types.md", import.meta.url),
-      new URL("./design/compositions/Users.md", import.meta.url)
+      new URL("./design/compositions/Users.md", import.meta.url),
+      new URL("./design/compositions/HouseholdManagement.md", import.meta.url),
     ],
   },
   projections: [httpWire({ policy, name: "ShiftHappensWireHttp" })],
