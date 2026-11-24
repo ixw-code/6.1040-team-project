@@ -2,7 +2,7 @@
 
 Completion Checking connects a resident’s submitted photo to their assigned task, its review decision, and contribution credit.
 
-PhotoChecking stores submissions and decisions. TaskTracking records task completion. Ranking records contribution credit. Reasoning holds questions and answers for optional AI review.
+PhotoChecking stores submissions and decisions. TaskScheduling records task completion. Ranking records contribution credit. Reasoning holds questions and answers for optional AI review.
 
 ## Submitting a completed task
 
@@ -56,7 +56,7 @@ CompletionChecking uses the login cookie to identify the caller. `POST` routes a
 | `POST` | `/api/completion/review-queue` | `household` |
 | `GET` | `/api/completion/submissions/:submission/photo` | `submission` in the path |
 
-The application returns `UNAVAILABLE` to signed-in callers until the team hooks for roles, task details, and completion are connected. The automated tests use real sessions and stored images with fixtures for those hooks.
+The application reads tasks and assignments from TaskScheduling, membership and oversight from HouseholdManaging, and evidence instructions from ChoreCataloguing. After approval, TaskScheduling records the submission time as the completion time so review delay does not affect lateness. PhotoChecking keeps the submission identity and review time.
 
 ## Choosing AI review - Beta
 

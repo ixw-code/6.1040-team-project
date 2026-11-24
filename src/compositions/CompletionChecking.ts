@@ -26,11 +26,53 @@ export type TaskCompletion = {
   reviewedAt: Date;
 };
 
-// Connect the team's role and task operations here when they are available.
+// Adapt the task, role, and completion operations used by the HTTP handler.
 export interface CompletionHooks {
   task(task: string): CompletionTask | undefined | Promise<CompletionTask | undefined>;
   role(household: string, person: string): HouseholdRole | undefined | Promise<HouseholdRole | undefined>;
   recordCompletion(completion: TaskCompletion): Promise<void>;
+}
+
+export function createCompletionHooks({
+  TaskScheduling, HouseholdManaging, ChoreCataloguing,
+}: ReturnType<typeof assembleApplication>["concepts"]): CompletionHooks {
+  return {
+    async task(task) {
+      const [entry] = await TaskScheduling._get({ task });
+      if (!entry) return;
+      const [chore] = await ChoreCataloguing._get({ chore: entry.item });
+      const details = chore?.group === entry.group ? chore : undefined;
+      const completed = entry.completedAt !== undefined;
+      return {
+        task,
+        household: entry.group,
+        assignee: entry.assignee ?? "",
+        title: details?.name ?? "Chore",
+        criteria: details?.requirements.join("\n") ?? "",
+        photoInstructions: details?.description ?? "",
+        baseline: details?.references[0] ?? "",
+        dueAt: entry.deadline ?? entry.interval!.end,
+        active: !completed && entry.assignee !== undefined,
+        completed,
+      };
+    },
+    async role(household, person) {
+      const [home] = await HouseholdManaging._household({ household });
+      if (!home) return;
+      if (home.overseer === person) return "OVERSEER";
+      if ((await HouseholdManaging._allResidents({ household, people: [person] })).all) return "RESIDENT";
+    },
+    async recordCompletion({ task, person, submittedAt }) {
+      try {
+        const result = await TaskScheduling.complete({ task, completedBy: person, completedAt: submittedAt });
+        if ("error" in result) throw result;
+      } catch (error) {
+        if (!error || typeof error !== "object" || !("error" in error) || error.error !== "TASK_STATUS_CONFLICT") throw error;
+        const [entry] = await TaskScheduling._get({ task });
+        if (entry?.completedBy !== person || entry.completedAt?.getTime() !== submittedAt.getTime()) throw error;
+      }
+    },
+  };
 }
 
 const prefix = "/api/completion/";
@@ -176,7 +218,7 @@ export function createCompletionHandler(
       switch (input.operation) {
         case "submit": {
           const task = await hooks.task(input.task);
-          if (!task?.active || task.assignee !== person || await hooks.role(task.household, person) !== "RESIDENT") {
+          if (!task?.active || task.assignee !== person || !await hooks.role(task.household, person)) {
             return failure(404);
           }
           if (!await photos.owns(input.photo, person)) return failure(404);

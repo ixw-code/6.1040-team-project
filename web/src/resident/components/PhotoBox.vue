@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// A photo, or a striped placeholder when we don't have one yet (no photo storage on the backend).
+// Displays a stored or locally previewed photo, or a placeholder when no photo is available.
 defineProps<{ url: string | null; label: string; text?: string }>();
 </script>
 

@@ -34,12 +34,15 @@ bun run dev
 
 This starts MongoDB, waits for an authenticated read/write check, and starts both
 the backend and Vue frontend in watch mode. Open <http://localhost:5173>.
+The development backend accepts requests from that origin by default. If you open
+the frontend at a different origin, set `PUBLIC_ORIGIN` to that origin before
+starting the backend.
 
 The backend runs at <http://127.0.0.1:3000>. Its `/health` route returns HTTP 200
 when MongoDB responds and 503 when it is unavailable. Vite forwards `/api` and
 `/health` requests from the frontend to that backend, so browser requests can use
-relative URLs. If you override the backend's `HOST` or `PORT`, update the proxy
-targets in `web/vite.config.ts` as well.
+relative URLs. Vite uses the same `PORT` setting as the backend and connects
+over loopback.
 
 Ctrl+C stops both development servers. MongoDB remains running so local data
 stays available.
@@ -61,6 +64,25 @@ bun run dev:backend
 ```sh
 bun run dev:frontend
 ```
+
+## Deployment
+
+Run these commands from the repository root:
+
+```sh
+bun install --frozen-lockfile
+bun run build
+bun run start
+```
+
+Set `MONGODB_URI` to the deployment database and `PUBLIC_ORIGIN` to the
+public HTTPS origin before starting the server. The production server defaults
+to listening on `0.0.0.0:3000` and accepts `HOST` and `PORT` overrides.
+Configure HTTPS on the reverse proxy and forward the frontend, `/api`, and
+`/health` to this one process. Browser sign-in uses a Secure session cookie.
+
+Keep `web/dist` with the backend source and runtime dependencies in the deployed
+artifact. Vite runs during the build. Bun serves the generated HTML and assets.
 
 ## Backend tests
 
