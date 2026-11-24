@@ -91,7 +91,7 @@ function onPhoto(event: Event) {
         <h2 class="rs-heading sub">Criteria:</h2>
         <p class="rs-body-text">{{ task.criteria }}</p>
       </section>
-      <section>
+      <section v-if="task.references.length">
         <h2 class="rs-heading sub">Reference Images:</h2>
         <div class="thumbs">
           <button

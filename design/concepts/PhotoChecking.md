@@ -44,7 +44,7 @@ a set of Submissions with
   a subject Subject
   a photo Photo
   a criteria String
-  a baseline Photo
+  an optional baseline Photo
   a selectedMethod ReviewMethod
   a reviewMethod ReviewMethod
   a status Status
@@ -71,7 +71,7 @@ Rule: a submission's person, subject, photo, criteria, baseline, selectedMethod,
 ## Actions
 
 ```actions
-submit(person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, method: ReviewMethod, submittedAt?: DateTime) : returns (submission: Submission)
+submit(person: Person, subject: Subject, photo: Photo, criteria: String, baseline?: Photo, method: ReviewMethod, submittedAt?: DateTime) : returns (submission: Submission)
     where the subject's current submission is pending
     then
       refuses ALREADY_PENDING "This subject already has a pending submission."
@@ -83,7 +83,7 @@ submit(person: Person, subject: Subject, photo: Photo, criteria: String, baselin
     where the subject has no current submission or its current submission is rejected
     then
       add a new submission with person, subject, photo, criteria,
-        baseline, selectedMethod method, reviewMethod method,
+        baseline if supplied, selectedMethod method, reviewMethod method,
         status pending, the submission time supplied by the composition or now if omitted, and empty feedback
       make the new submission current for subject
       preserve earlier submissions
@@ -161,7 +161,7 @@ sendToOverseer(submission: Submission) : returns (submission: Submission)
 _current(subject: Subject) : optional (submission: Submission)
   Returns the subject's current submission, or no row if it has none.
 
-_submission(submission: Submission) : optional (person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, selectedMethod: ReviewMethod, reviewMethod: ReviewMethod, status: Status, submittedAt: DateTime, reviewer?: Reviewer, reviewedAt?: DateTime, feedback: String)
+_submission(submission: Submission) : optional (person: Person, subject: Subject, photo: Photo, criteria: String, baseline?: Photo, selectedMethod: ReviewMethod, reviewMethod: ReviewMethod, status: Status, submittedAt: DateTime, reviewer?: Reviewer, reviewedAt?: DateTime, feedback: String)
   Returns the submission's evidence and review details, or no row if it does not exist.
 
 _history(subject: Subject) : many (submission: Submission, status: Status, submittedAt: DateTime, reviewedAt?: DateTime, feedback: String)

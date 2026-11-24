@@ -82,16 +82,17 @@ export function createCatalogHandler(
         return "error" in result ? failure(409, result.error) : Response.json(result);
       }
       const { name, category, difficulty, description, criteria, photo } = body;
-      if (![name, description, criteria, photo].every(text) || (category !== undefined && !text(category))
+      if (![name, description, criteria].every(text) || (photo !== undefined && !text(photo))
+        || (category !== undefined && !text(category))
         || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 10) return failure(400, "INVALID_REQUEST");
       if (category !== undefined) {
         const categories = await HouseholdManaging._categories({ household });
         if (!categories.some(c => c.category === category)) return failure(404, "NOT_FOUND");
       }
-      if (!await photos.owns(photo, requester)) return failure(404, "NOT_FOUND");
+      if (photo !== undefined && !await photos.owns(photo, requester)) return failure(404, "NOT_FOUND");
       const result = await ChoreCataloguing.create({
         group: household, name: name.trim(), category, difficulty, description: description.trim(),
-        requirements: [criteria.trim()], references: [photo],
+        requirements: [criteria.trim()], references: photo === undefined ? [] : [photo],
       });
       return "error" in result ? failure(409, result.error) : Response.json(result, { status: 201 });
     } catch {

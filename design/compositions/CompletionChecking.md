@@ -12,7 +12,7 @@ The server accepts evidence from the scheduled start through the scheduled end o
 
 The resident uploads the image first and receives a photo ID. Submitting that ID attaches the stored image to the task after CompletionChecking verifies that the signed-in resident uploaded it.
 
-The resident opens the task to see its completion criteria, photo instructions, and baseline image. Submitting records the photo, submission time, a saved copy of the criteria, and baseline for that attempt. Later changes to the task’s instructions do not change how an existing submission is reviewed.
+The resident opens the task to see its completion criteria and photo instructions. The overseer can provide a baseline photo as a guide. PhotoChecking saves each attempt’s photo, submission time, criteria, and any available baseline reference so the review uses the criteria and reference from that attempt.
 
 A new submission starts as pending. Submitting a photo does not mark the task complete or award a point. A task with a pending or approved submission cannot receive another submission. If a submission is rejected, the resident can address the reason and submit another attempt while that occurrence’s window is still open.
 
@@ -34,7 +34,7 @@ The image route takes a submission ID and checks the submission's household befo
 
 Only an Overseer for the submission’s household can review it. The review endpoint checks the session and this permission before recording an approval or rejection.
 
-The review queue lists current submissions awaiting manual review in that household. Each item includes the resident, task, photo, completion criteria, baseline, and submission time. The Overseer can inspect the evidence and approve or reject it from the same screen.
+The review queue lists current submissions awaiting manual review in that household. Each item includes the resident, task, photo, completion criteria, and submission time. When the attempt has a baseline, the queue shows it alongside the submitted photo. The Overseer can inspect the evidence and approve or reject it from the same screen.
 
 Approval records the reviewer and review time. Rejection also requires a reason explaining what needs to be corrected or shown more clearly. The rejected submission and its feedback remain in the resident’s history.
 
@@ -42,7 +42,7 @@ Only pending submissions can receive a decision. An approved submission cannot b
 
 ## Completion and contribution credit
 
-Approving the current submission calls the task completion hook. The completion identifies the supporting submission and keeps both its submission and approval times. Only an approval completes the task.
+Approving the current submission calls the task completion hook. TaskScheduling stores `completedBy` and `completedAt` on the task, using the original `submittedAt` value for `completedAt`. PhotoChecking stores the submission ID, the task ID as `subject`, and the `submittedAt` and `reviewedAt` timestamps. Only an approval completes the task.
 
 Once the hook confirms task completion, Ranking credits the submitting resident one point for that task occurrence. An Overseer can retry an approval to finish recording completion or credit after an interruption. A retry uses the original approval, and each task occurrence earns a single point.
 
@@ -57,7 +57,7 @@ CompletionChecking uses the login cookie to identify the caller. `POST` routes a
 | `POST` | `/api/completion/review` | `submission`, `decision`, optional `feedback` |
 | `POST` | `/api/completion/review-queue` | `household` |
 | `POST` | `/api/completion/reviewed` | `household` |
-| `GET` | `/api/completion/submissions/:submission/baseline` | saved baseline for the attempt |
+| `GET` | `/api/completion/submissions/:submission/baseline` | saved baseline, or `404` when the attempt has no baseline |
 | `GET` | `/api/completion/submissions/:submission/photo` | `submission` in the path |
 
 The running application resolves household roles through HouseholdManaging and reads tasks and chore details through TaskScheduling and ChoreCataloguing. Approval records the original submission time on the scheduled task before crediting Ranking.
@@ -88,9 +88,9 @@ CompletionChecking.DisableAI at /completion/ai/off
 
 ## Assessing photos - Beta
 
-Submitting a photo for AI review creates an assessment request through Reasoning.[ask] The request identifies the specific submission and asks whether its photo meets the saved completion criteria, using the baseline as a reference. An open-request check prevents duplicate assessments of the same attempt.[open]
+Submitting a photo for AI review creates an assessment request through Reasoning.[ask] The request identifies the specific submission and asks whether its photo meets the saved completion criteria, using the baseline as a reference when provided. An open-request check prevents duplicate assessments of the same attempt.[open]
 
-The checking agent takes the request and retrieves its photo, criteria, and baseline through the evidence endpoint.[evidence] The endpoint authenticates the agent and checks that it currently holds the request.
+The checking agent takes the request and retrieves its photo, criteria, and any baseline through the evidence endpoint.[evidence] The endpoint authenticates the agent and checks that it currently holds the request.
 
 Evidence is returned only while the task is active, the submission is current and pending AI review, and the resident still consents. Otherwise, the agent stops processing the request.
 

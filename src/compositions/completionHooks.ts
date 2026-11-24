@@ -14,7 +14,7 @@ export function completionHooks({ TaskScheduling, ChoreCataloguing, HouseholdMan
       return {
         task, household: entry.group, assignee: entry.assignee ?? "", title: chore.name,
         criteria: chore.requirements.join("\n"), photoInstructions: chore.description,
-        baseline: chore.references[0] ?? "", dueAt: entry.deadline ?? entry.interval!.end, interval: entry.interval,
+        baseline: chore.references[0], dueAt: entry.deadline ?? entry.interval!.end, interval: entry.interval,
         active: !entry.archived && !entry.completedAt, archived: entry.archived, completed: Boolean(entry.completedAt),
       };
     },

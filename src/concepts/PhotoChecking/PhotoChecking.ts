@@ -12,7 +12,7 @@ type ReviewMethod = "MANUAL" | "AUTOMATIC";
 type Status = "PENDING" | "APPROVED" | "REJECTED";
 
 // Copy the evidence and criteria into each attempt so earlier reviews keep their original context.
-type Evidence = { person: string; subject: string; photo: string; criteria: string; baseline: string };
+type Evidence = { person: string; subject: string; photo: string; criteria: string; baseline?: string };
 type SubmissionDetails = Evidence & {
   selectedMethod: ReviewMethod;
   reviewMethod: ReviewMethod;
@@ -79,7 +79,7 @@ export class PhotoCheckingConcept {
           subject,
           photo,
           criteria,
-          baseline,
+          ...(baseline && { baseline }),
           selectedMethod: method,
           reviewMethod: method,
           status: "PENDING",
@@ -162,7 +162,10 @@ export class PhotoCheckingConcept {
     const row = await this.#submissions().findOne<SubmissionDetails>(
       { _id: submission }, { projection: { _id: 0, attempt: 0 } },
     );
-    return row ? [row] : [];
+    if (!row) return [];
+    // Earlier submissions used an empty string when the chore had no reference photo.
+    if (row.baseline === "") delete row.baseline;
+    return [row];
   }
 
   async _history({ subject }: { subject: string }): Promise<HistoryRow[]> {

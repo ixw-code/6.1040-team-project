@@ -52,11 +52,9 @@ async function run(action: () => Promise<string>) {
 }
 async function addChore() {
   const file = fileInput.value?.files?.[0];
-  if (!file) throw new Error("Choose a baseline photo.");
-  const photo = await upload(file);
   const result = await post<{ chore: string }>("catalog/create", {
     household, name: title.value, criteria: criteria.value, description: instructions.value,
-    difficulty: difficulty.value, photo,
+    difficulty: difficulty.value, ...(file && { photo: await upload(file) }),
   });
   chore.value = result.chore;
   title.value = "";
@@ -120,8 +118,8 @@ async function addTask() {
           <label>Description and photo instructions<textarea v-model="instructions" required maxlength="4000"></textarea></label>
           <label>Effort (1–10)<input v-model.number="difficulty" type="number" required min="1" max="10"></label>
           <label>Completion criteria<textarea v-model="criteria" required maxlength="4000"></textarea></label>
-          <label>Baseline photo (JPG, PNG or WebP, up to 10 MB)
-            <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" required>
+          <label>Baseline photo (optional, JPG, PNG or WebP up to 10 MB)
+            <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp">
           </label>
           <button class="button button-primary" :disabled="busy">Save chore</button>
         </form>

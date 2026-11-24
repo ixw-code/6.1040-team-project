@@ -57,7 +57,7 @@ ChoreAssignments.UpdateInterval at /assignments/tasks/interval
 
 ## Auto-scheduling
 
-Every Sunday night, the coming week is auto-scheduled for each household, so no one has to remember to do it. Scheduling gives each unassigned task to an available resident. The [WeeklyAutoSchedule endpoint](reaction:ChoreAssignments.WeeklyAutoSchedule) is triggered by an external scheduler using a current overseer session. The external scheduler supplies the household and the UTC week boundaries and invokes `TaskScheduling.autoSchedule` with `onlyUnassigned = true`, preserving existing assignments.
+In alpha, the overseer selects a week in **Manage** and clicks **Assign available residents**. The frontend sends the household and the selected week's UTC boundaries to the [WeeklyAutoSchedule endpoint](reaction:ChoreAssignments.WeeklyAutoSchedule). The endpoint checks the overseer's session and invokes `TaskScheduling.autoSchedule` with `onlyUnassigned = true` to fill open assignments.
 
 The overseer can also auto-schedule a manually selected period on demand. The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) verifies their permission. The [AutoSchedule endpoint](reaction:ChoreAssignments.AutoSchedule) invokes `TaskScheduling.autoSchedule` with the selected period and `onlyUnassigned` flag. When true, existing assignments are preserved; otherwise, automatic assignments are recalculated. Manual assignments and completed tasks always remain unchanged.
 
@@ -142,15 +142,13 @@ assignmentIsIncomplete(completedAt?: DateTime) : IncompleteMatch
   Reports whether the task has no completion timestamp.
 ```
 
-Alpha supports the join/leave, availability-setting, task creation, weekly and manual scheduling, and schedule reading behavior for the current ChoreAssignment app. Swapping between two parties can be coordinated primitively, ie external to the app and overseers manually reassign them.
+Alpha supports joining and leaving households, setting availability, creating tasks, assigning tasks manually or automatically for a selected week, and reading the schedule. Residents can arrange a swap outside the app and ask the overseer to reassign the tasks.
 
 ### Extensions
-Beta will add the following:
-
-Roles are limited to one overseer and residents handled by `HouseholdManaging`, while a future `Roling` concept may make access to features more granular or give multiple residents overseer-level permissions.
+Possible Beta extensions include scheduling an automatic Sunday-night assignment run for each household and introducing a `Roling` concept for more granular permissions or multiple overseers. Alpha uses `HouseholdManaging` for membership and one overseer per household.
 
 Currently, swapping is described in theory primitive but will require a new `Trading` concept to record offers from one resident and the other's acceptance as well as cancellation. This concept will be essential for handling race conditions.
 
-Currently, chores are manually created and scheduled, while the "auto-scheduler" only automatically assigns them. In the future, chores can be instantiated as tasks with an external scheduler that uses a new `Recurring` concept to store state about chores that recur every week, perhaps. Chores can then be differentiated as "recurring" or "one-time."
+Alpha lets the overseer create one-time tasks and weekly series with a selected end date. A future `Recurring` concept could generate more occurrences as an ongoing series continues.
 
 In the future, a `Notifying` concept and/or a `Notifications` composition will react to the actions concerned in this `ChoreAssignments` composition to make the overall experience smoother.

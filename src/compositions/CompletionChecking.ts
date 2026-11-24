@@ -13,7 +13,7 @@ export type CompletionTask = {
   title: string;
   criteria: string;
   photoInstructions: string;
-  baseline: string;
+  baseline?: string;
   dueAt: Date;
   interval?: { start: Date; end: Date };
   active: boolean;
@@ -170,8 +170,9 @@ export function createCompletionHandler(
         const role = await hooks.role(task.household, person);
         if (role !== "OVERSEER" && (role !== "RESIDENT" || details.person !== person)) return failure(404);
         // Resolve the file from the authorized submission, including the original uploader.
+        const { baseline, photo, person: uploader } = details;
         const stored = attachment[2] === "baseline"
-          ? await photos.readReference(details.baseline) : await photos.read(details.photo, details.person);
+          ? baseline && await photos.readReference(baseline) : await photos.read(photo, uploader);
         return stored ? photoResponse(stored) : failure(404);
       }
 

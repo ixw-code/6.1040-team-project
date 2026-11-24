@@ -177,10 +177,10 @@ test("weekly weekend occurrences keep evidence and credit through reassignment a
   for (const username of ["weekend-resident", "weekend-backup"]) {
     await post("catalog/add-resident", owner.cookie, { household, username });
   }
-  const baseline = await upload(owner.cookie, 1);
-  const { chore } = await post("catalog/create", owner.cookie, {
-    household, name: "Kitchen", difficulty: 4, description: "Show the sink.", criteria: "Sink empty.", photo: baseline,
-  });
+  const definition = { household, name: "Kitchen", difficulty: 4, description: "Show the sink.", criteria: "Sink empty." };
+  expect((await send("catalog/create", owner.cookie, { ...definition, photo: "" })).status).toBe(400);
+  const { chore } = await post("catalog/create", owner.cookie, definition);
+  expect(await post("catalog/list", resident.cookie, { household })).toMatchObject({ chores: [{ chore, references: [] }] });
   const availableOnSunday = (Sunday: string) => ({ household, timeZone: "UTC", days: {
     Monday: "NOT_AVAILABLE", Tuesday: "NOT_AVAILABLE", Wednesday: "NOT_AVAILABLE", Thursday: "NOT_AVAILABLE",
     Friday: "NOT_AVAILABLE", Saturday: "NOT_AVAILABLE", Sunday,
@@ -205,11 +205,24 @@ test("weekly weekend occurrences keep evidence and credit through reassignment a
   const early = await send("completion/submit", resident.cookie, { ...second, photo });
   expect(await early.json()).toEqual({ error: "SUBMISSION_NOT_OPEN" });
   const attempt = await post("completion/submit", resident.cookie, { ...first, photo });
+  const { queue } = await post("completion/review-queue", owner.cookie, { household });
+  expect(queue.items).toMatchObject([{ ...attempt, ...first, photo, criteria: definition.criteria }]);
+  expect(queue.items[0]).not.toHaveProperty("baseline");
+  expect((await send(`completion/submissions/${attempt.submission}/baseline`, owner.cookie)).status).toBe(404);
   await post("completion/review", owner.cookie, { ...attempt, decision: "REJECT", feedback: "Show the full sink." });
   setTime("2027-03-13T17:00:00Z");
   const retry = await post("completion/submit", resident.cookie, { ...first, photo });
   setTime("2027-03-15T13:00:00Z");
   await post("completion/review", owner.cookie, { ...retry, decision: "APPROVE" });
+  const { completion: approved } = await post("completion/get", resident.cookie, first);
+  expect(approved.task).not.toHaveProperty("baseline");
+  expect(approved.current[0]).not.toHaveProperty("baseline");
+  expect(approved.current[0]).toMatchObject({
+    ...retry, submittedAt: "2027-03-13T17:00:00.000Z", reviewedAt: expect.any(String), status: "APPROVED",
+  });
+  expect(await post("assignments/task", resident.cookie, { household, ...first })).toMatchObject({
+    task: { completedBy: resident.user, completedAt: approved.current[0].submittedAt },
+  });
   expect(await post("completion/get", resident.cookie, second)).toMatchObject({ completion: { current: [], history: [] } });
 
   await post("households/residents/remove", owner.cookie, { household, person: resident.user });

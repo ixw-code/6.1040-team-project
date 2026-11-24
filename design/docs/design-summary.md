@@ -1,8 +1,8 @@
 # Concepts that make up *Shift Happens*
 
-The overall design of *Shift Happens* is visualized in the below concept map, where concepts and compositions connect to *Shift Happens* in the center. Prose explanations follow.
+The concept map shows the original design for *Shift Happens*, including planned concepts such as `Roling`.
 
-![Concept Map](attachments/concept-map.png)
+![Concept Map](../attachments/concept-map.png)
 
 ## Core features
 
@@ -14,7 +14,9 @@ The problem of **unclear assignments** and **uneven responsibilities** within a 
 
 After a chore is completed, the assigned user is given a point in `Ranking`. `Ranking` then allows *Shift Happens* to display a leaderboard based on all accumulated points by a user in a household.
 
-References above to "the Overseer" are designated by `Roling`.  `Roling` defines which users are Overseer(s) of the household versus standard residents, and which actions can be taken by these roles.
+In alpha, the overseer runs automatic assignment for a selected week from **Manage → Assign available residents**. A scheduled Sunday-night run is a possible Beta extension.
+
+`HouseholdManaging` records household membership and one overseer per household. The compositions use that record to check which actions each person can take. `Roling` is a possible Beta extension for more granular permissions.
 
 ## Bonus features
 

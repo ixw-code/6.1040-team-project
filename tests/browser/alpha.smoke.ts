@@ -63,19 +63,21 @@ async function register(page: Page, username: string) {
   await visibleText(page, "Your households");
 }
 
-async function saveChore(page: Page, name: string) {
+async function saveChore(page: Page, name: string, baseline?: typeof image) {
   await label(page, "Chore name").fill(name);
   await label(page, "Effort (1–10)").fill("4");
   await label(page, "Description and photo instructions").fill("Photograph the whole sink.");
   await label(page, "Completion criteria").fill("The sink is empty.");
-  await page.getByLabel("Baseline photo").setInputFiles(image);
+  if (baseline) await page.getByLabel("Baseline photo").setInputFiles(baseline);
   await button(page, "Save chore").click();
   await page.getByRole("region", { name: "Chore catalog" }).getByText(name, { exact: true }).waitFor();
 }
 
-async function createAssignment(page: Page, startDay: number, endDay = startDay, repeatThrough?: number) {
+async function createAssignment(page: Page, { startDay, endDay = startDay, repeatThrough, chore = "Wash dishes" }: {
+  startDay: number; endDay?: number; repeatThrough?: number; chore?: string;
+}) {
   await button(page, "Chore catalog").click();
-  await page.getByLabel("Catalog chore").selectOption({ label: "Wash dishes" });
+  await page.getByLabel("Catalog chore").selectOption({ label: chore });
   if (startDay === endDay) {
     await label(page, "Task date").fill(dateInput(startDay));
   } else {
@@ -121,7 +123,7 @@ async function run(browser: Browser) {
 
   await button(owner, "Chore catalog").click();
   await saveChore(owner, "Wash dishes");
-  await saveChore(owner, "Sweep floor");
+  await saveChore(owner, "Sweep floor", image);
   await button(resident, "Refresh board").click();
   await button(resident, "Prefs").click();
   await button(resident, "Move Wash dishes up").click();
@@ -130,13 +132,17 @@ async function run(browser: Browser) {
   await button(resident, "My Tasks").click();
   await visibleText(resident, "No tasks yet");
 
-  await createAssignment(owner, -2);
-  await createAssignment(owner, -1, 1);
-  await createAssignment(owner, 14, 14, 21);
+  await createAssignment(owner, { startDay: -2 });
+  await createAssignment(owner, { startDay: -1, endDay: 1 });
+  await createAssignment(owner, { startDay: 14, repeatThrough: 21 });
+  await createAssignment(owner, { startDay: 28, chore: "Sweep floor" });
   await button(resident, "Refresh board").click();
   const notes = resident.getByRole("button", { name: /Wash dishes/ });
   await notes.nth(3).waitFor();
   assert.equal(await notes.count(), 4);
+  await resident.getByRole("button", { name: /Sweep floor/ }).click();
+  await resident.getByRole("img", { name: "Reference image 1" }).evaluate(img => (img as HTMLImageElement).decode());
+  await resident.locator("button.rs-back").click();
   for (const occurrence of [
     { date: -2, message: "The submission window has closed." },
     { date: 14, message: `Submissions open ${shortDate.format(dateAt(14))}, 12:00 AM.` },
@@ -147,9 +153,13 @@ async function run(browser: Browser) {
     await resident.locator("button.rs-back").click();
   }
   await notes.filter({ hasText: shortDate.format(dateAt(1)) }).click();
+  await visibleText(resident, "Criteria:");
+  assert.equal(await resident.getByText("Reference Images:", { exact: true }).count(), 0);
   await submitEvidence(resident);
 
   await button(owner, "Review queue").click();
+  await button(owner, "Reject").waitFor();
+  assert.equal(await owner.getByText("Baseline photo", { exact: true }).count(), 0);
   await button(owner, "Reject").click();
   await visibleText(owner, "Add feedback so the resident knows what to fix.");
   await label(owner, "Feedback (required for rejection)").fill("Include the whole sink.");

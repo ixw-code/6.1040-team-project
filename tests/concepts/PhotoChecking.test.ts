@@ -14,6 +14,16 @@ const evidence = {
 describe("PhotoChecking", () => {
   const getTestDb = useMongoTestDb("photo_checking");
 
+  test("reads an older submission with an empty baseline as having no reference", async () => {
+    const checking = new PhotoCheckingConcept(getTestDb);
+    const { submission } = await checking.submit({ ...evidence, subject: "legacy-no-reference" });
+    await getTestDb().collection<{ _id: string }>("photo_checking_submissions")
+      .updateOne({ _id: submission }, { $set: { baseline: "" } });
+    const [saved] = await checking._submission({ submission });
+    expect(saved).toMatchObject({ photo: evidence.photo, criteria: evidence.criteria });
+    expect(saved).not.toHaveProperty("baseline");
+  });
+
   test("preserves rejected evidence when a resident resubmits and receives approval", async () => {
     const { concepts: { PhotoChecking } } = assembleApplication(getTestDb);
     const subject = "monday-sink";

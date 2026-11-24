@@ -4,7 +4,7 @@ import EvidencePhoto from "./EvidencePhoto.vue";
 import { evidenceUrl, post, useHousehold } from "../household.ts";
 
 type Entry = {
-  submission: string; task: string; title: string; person: string; baseline: string; criteria: string;
+  submission: string; task: string; title: string; person: string; baseline?: string; criteria: string;
   submittedAt: string; status?: string; feedback?: string;
 };
 const { home, catalog, refresh } = useHousehold();

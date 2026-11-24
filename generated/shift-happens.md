@@ -136,7 +136,7 @@ Defined in [PhotoChecking](../design/concepts/PhotoChecking.md), line 1.
 
 #### Actions
 
-- `submit(person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, method: ReviewMethod, submittedAt?: DateTime) : returns (submission: Submission)`
+- `submit(person: Person, subject: Subject, photo: Photo, criteria: String, baseline?: Photo, method: ReviewMethod, submittedAt?: DateTime) : returns (submission: Submission)`
   - Refuses `ALREADY_PENDING`: This subject already has a pending submission.
   - Refuses `ALREADY_APPROVED`: This subject already has an approved submission.
 - `approve(submission: Submission, reviewer: Reviewer, method: ReviewMethod, feedback: String) : returns (submission: Submission, subject: Subject, person: Person)`
@@ -155,7 +155,7 @@ Defined in [PhotoChecking](../design/concepts/PhotoChecking.md), line 1.
 #### Queries
 
 - `_current(subject: Subject) : optional (submission: Submission)`
-- `_submission(submission: Submission) : optional (person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, selectedMethod: ReviewMethod, reviewMethod: ReviewMethod, status: Status, submittedAt: DateTime, reviewer?: Reviewer, reviewedAt?: DateTime, feedback: String)`
+- `_submission(submission: Submission) : optional (person: Person, subject: Subject, photo: Photo, criteria: String, baseline?: Photo, selectedMethod: ReviewMethod, reviewMethod: ReviewMethod, status: Status, submittedAt: DateTime, reviewer?: Reviewer, reviewedAt?: DateTime, feedback: String)`
 - `_history(subject: Subject) : many (submission: Submission, status: Status, submittedAt: DateTime, reviewedAt?: DateTime, feedback: String)`
 - `_pending(method: ReviewMethod) : many (submission: Submission, subject: Subject, person: Person, submittedAt: DateTime)`
 
