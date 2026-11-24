@@ -8,8 +8,8 @@ import {
   type CompletionHooks,
   type CompletionTask,
   type TaskCompletion,
-} from "../../src/compositions/CompletionChecking.ts";
-import { createPhotoHandler, createPhotoStore } from "../../src/compositions/Photos.ts";
+} from "../../src/adapters/completionHttp.ts";
+import { createPhotoHandler, createPhotoStore } from "../../src/adapters/photos.ts";
 import { accountRequests } from "../helpers/accounts.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";
 
@@ -252,7 +252,7 @@ describe("Production completion", () => {
   const database = useMongoTestDb("completion_live");
 
   test("records an approved upload against the scheduled task and credits it once", async () => {
-    const { createCompletionHooks } = await import("../../src/compositions/CompletionChecking.ts");
+    const { createCompletionHooks } = await import("../../src/adapters/completionHttp.ts");
     const application = assembleApplication(database);
     const { ChoreCataloguing, TaskScheduling, Ranking, Sessioning } = application.concepts;
     const { session, accountRequest } = accountRequests(application);
@@ -296,9 +296,20 @@ describe("Production completion", () => {
     expect(upload.status).toBe(201);
     const { photo } = await upload.json();
     const { post } = requests(createCompletionHandler(application.concepts, photos, createCompletionHooks(application.concepts)));
-    const result = await post("submit", { task, photo }, resident.cookie);
-    expect(result.status).toBe(200);
-    const review = { submission: result.body.submission, decision: "APPROVE" };
+    const token = resident.cookie.split("=")[1];
+    expect(await application.invoker.invoke("/completion/submit", {
+      session: token, task, photo: "missing-upload",
+    }, { timeoutMs: 2000 })).toMatchObject({ ok: false, error: { kind: "domain", value: "NOT_FOUND" } });
+    const foreignUpload = await createPhotoHandler(photos, Sessioning)(new Request(url + "/api/photos", {
+      method: "POST", headers: { Cookie: owner.cookie, "Content-Type": "image/png" }, body: png,
+    }));
+    expect(foreignUpload.status).toBe(201);
+    const foreign = await foreignUpload.json();
+    expect(await application.invoker.invoke("/completion/submit", {
+      session: token, task, photo: foreign.photo,
+    }, { timeoutMs: 2000 })).toMatchObject({ ok: false, error: { kind: "domain", value: "NOT_FOUND" } });
+    const result = await call("/completion/submit", { task, photo }, resident.cookie);
+    const review = { submission: result.submission, decision: "APPROVE" };
     expect(await post("review", review, resident.cookie)).toEqual(notFound);
     expect((await post("review", review, owner.cookie)).status).toBe(200);
     expect((await post("review", review, owner.cookie)).status).toBe(200);

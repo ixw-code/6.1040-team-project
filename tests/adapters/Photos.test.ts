@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Db } from "mongodb";
 import { assembleApplication } from "../../src/assembly.ts";
-import { createPhotoHandler, createPhotoStore } from "../../src/compositions/Photos.ts";
+import { createPhotoHandler, createPhotoStore } from "../../src/adapters/photos.ts";
 import { maxRequestBodyBytes, policy, sessionCookieName } from "../../src/http.ts";
 import { accountRequests } from "../helpers/accounts.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";

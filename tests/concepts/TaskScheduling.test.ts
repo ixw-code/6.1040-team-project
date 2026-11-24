@@ -73,6 +73,13 @@ describe("TaskScheduling task lifecycle", () => {
     expect(await concept.complete({ task: late, completedBy: "alice", completedAt: at(4) }))
       .toEqual({ task: late, completedBy: "alice", completedAt: at(4) });
     await concept.complete({ task: onTime, completedBy: "alice", completedAt: at(9) });
+    expect(await concept._completionContext({ task: late })).toEqual([
+      { group, item: definition.item, dueAt: at(6), completion: "COMPLETED" },
+    ]);
+    expect(await concept._completionContext({ task: overdue })).toEqual([
+      { group, item: definition.item, dueAt: at(7), completion: "INCOMPLETE" },
+    ]);
+    expect(await concept._completionContext({ task: "missing" })).toEqual([]);
     expect(await concept._status({ task: late, asOf: at(2) })).toEqual([{ status: "COMPLETED_LATE" }]);
     expect(await concept._status({ task: onTime, asOf: at(10) })).toEqual([{ status: "COMPLETED" }]);
     expect(await concept._status({ task: overdue, asOf: at(7) })).toEqual([{ status: "PENDING" }]);

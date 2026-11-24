@@ -44,6 +44,9 @@ Source is AUTO or MANUAL
 Status is PENDING or OVERDUE or COMPLETED or COMPLETED_LATE
   Whether atask has been completed or not, in regards to its deadline.
 
+CompletionState is INCOMPLETE or COMPLETED
+  Whether the task has a recorded completion.
+
 opaque PersonSet
   A set of rows, each with a person: Person.
 
@@ -284,6 +287,9 @@ uncomplete(task: Task): returns (task: Task, lastCompletedBy: Person, lastComple
 ```queries
 _get(task: Task) : optional (group: Group, item: Item, category: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)
   Returns task details if task exists, or no rows otherwise.
+
+_completionContext(task: Task) : optional (group: Group, item: Item, assignee?: Person, dueAt: DateTime, completion: CompletionState)
+  Returns the task group, item, optional assignee, due time, and completion state from one read, or no row for an unknown task. The due time is the deadline if present, otherwise the scheduled interval end.
 
 _status(task: Task, asOf: DateTime) : optional (status: Status)
   Returns the task status, or no row for an unknown task. The cutoff is the interval end when present, otherwise the deadline. Incomplete tasks are overdue only when asOf is after the cutoff. Completed tasks are late only when completed after the cutoff.

@@ -18,7 +18,7 @@ const defaultPublicOrigin = process.env.NODE_ENV === "development"
 export const policy = httpPolicy({
   publicOrigin: process.env.PUBLIC_ORIGIN ?? defaultPublicOrigin,
   basePath: "/api",
-  publicErrors: { ...accountsHttp.publicErrors, ...passwordsHttp.publicErrors, ...householdHttpErrors, ...assignmentHttpErrors },
+  publicErrors: { ...accountsHttp.publicErrors, ...passwordsHttp.publicErrors, ...householdHttpErrors, ...assignmentHttpErrors, ALREADY_PENDING: "CONFLICT", ALREADY_APPROVED: "CONFLICT" },
   cookies: {
     session: accountsHttp.sessionCookie(sessionCookieName, passwordsHttp.startingSessions),
   },

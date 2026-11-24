@@ -157,7 +157,11 @@ sendToOverseer(submission: Submission) : returns (submission: Submission)
 
 ## Queries
 
+
 ```queries
+_ownedUpload(photo: Photo, person: Person) : optional (photo: Photo)
+  Returns the photo reference when the configured upload store confirms ownership by the person. Returns no row for missing or foreign uploads.
+
 _current(subject: Subject) : optional (submission: Submission)
   Returns the subject's current submission, or no row if it has none.
 

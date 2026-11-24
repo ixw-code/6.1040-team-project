@@ -371,6 +371,19 @@ export class TaskSchedulingConcept {
     return [{ group: state._id, ...details }];
   }
 
+  async _completionContext({ task }: TaskRef): Promise<
+    (GroupRef & { item: string; assignee?: string; dueAt: Date; completion: "INCOMPLETE" | "COMPLETED" })[]
+  > {
+    const [details] = await this._get({ task });
+    if (!details) return [];
+    const { group, item, assignee, deadline, interval } = details;
+    return [{
+      group, item, ...(assignee !== undefined && { assignee }),
+      dueAt: deadline ?? interval!.end,
+      completion: isCompleted(details) ? "COMPLETED" : "INCOMPLETE",
+    }];
+  }
+
   async _status({ task, asOf }: TaskRef & { asOf: Date }): Promise<{ status: Status }[]> {
     const [details] = await this._get({ task });
     return details ? [{ status: statusAt(details, asOf) }] : [];
