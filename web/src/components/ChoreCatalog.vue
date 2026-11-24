@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import {
-  assignmentWindows, localAssignmentTime, maxAssignmentOccurrences, mondayOf, type AssignmentDates,
+  assignmentWindows, assignmentWindowsOverlap, localAssignmentTime, maxAssignmentOccurrences, mondayOf, type AssignmentDates,
 } from "../../../src/shared/assignmentDates.ts";
 import { api } from "../api.ts";
 import { checked, localDate, post, upload, useHousehold } from "../household.ts";
@@ -87,6 +87,7 @@ async function addTask() {
     end: localAssignmentTime(endsOn, due.value).toISOString(),
   }));
   const repeatWeekly = frequency.value === "weekly";
+  if (repeatWeekly && assignmentWindowsOverlap(windows)) throw new Error("Choose a range whose weekly occurrences do not overlap.");
   const flexibleDays = startsOn.value !== lastDay.value;
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const input = { household, chore: chore.value, windows, repeatWeekly, flexibleDays, timeZone };

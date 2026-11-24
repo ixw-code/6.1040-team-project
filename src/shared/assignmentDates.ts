@@ -19,11 +19,18 @@ export function mondayOf(value: string): string {
 }
 
 export type AssignmentDates = { startsOn: string; endsOn: string };
+type AssignmentWindow = { start: Date | string; end: Date | string };
 
-export function submissionWindowState(window: { start: Date | string; end: Date | string }, now: number) {
-  if (now < new Date(window.start).getTime()) return "upcoming";
-  if (now > new Date(window.end).getTime()) return "closed";
-  return "open";
+export function submissionWindowState(window: AssignmentWindow, now: number) {
+  const start = new Date(window.start).getTime();
+  if (now >= start && now <= new Date(window.end).getTime()) return "open";
+  return now < start ? "upcoming" : "closed";
+}
+
+export function assignmentWindowsOverlap(windows: AssignmentWindow[]): boolean {
+  const sorted = windows.map(({ start, end }) => ({ start: new Date(start), end: new Date(end) }))
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  return sorted.some((window, index) => index > 0 && window.start < sorted[index - 1].end);
 }
 
 // Repeat whole calendar windows so local times stay steady across clock changes.

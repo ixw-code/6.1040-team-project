@@ -14,14 +14,15 @@ const database = useMongoTestDb("households");
 describe("HouseholdManaging", () => {
   test("creates a resident overseer, renames households, and lists memberships", async () => {
     const concept = new HouseholdManagingConcept(database);
-    const { household } = await concept.create({ name: "Zeta", overseer: "alice" });
-    const { household: other } = await concept.create({ name: "Beta", overseer: "alice" });
-    expect(await concept._residents({ household })).toEqual([{ person: "alice" }]);
+    const overseer = "membership-owner";
+    const { household } = await concept.create({ name: "Zeta", overseer });
+    const { household: other } = await concept.create({ name: "Beta", overseer });
+    expect(await concept._residents({ household })).toEqual([{ person: overseer }]);
     expect(await concept.rename({ household, name: "Alpha" })).toEqual({ household });
-    expect(await concept._household({ household })).toEqual([{ name: "Alpha", overseer: "alice" }]);
-    expect(await concept._householdsByPerson({ person: "alice" })).toEqual([
-      { household, name: "Alpha", overseer: "alice", categories: [] },
-      { household: other, name: "Beta", overseer: "alice", categories: [] },
+    expect(await concept._household({ household })).toEqual([{ name: "Alpha", overseer }]);
+    expect(await concept._householdsByPerson({ person: overseer })).toEqual([
+      { household, name: "Alpha", overseer, categories: [] },
+      { household: other, name: "Beta", overseer, categories: [] },
     ]);
   });
 

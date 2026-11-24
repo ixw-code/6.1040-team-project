@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { api } from "../api.ts";
 import { checked, post, useHousehold, weekWindow, type AssignmentRow } from "../household.ts";
 
@@ -82,7 +82,7 @@ function deleteAssignment(row: AssignmentRow) {
 function loadWeek() {
   if (week.value) void run(async () => { await loadAssignments(); return ""; });
 }
-onMounted(loadWeek);
+watch(week, loadWeek, { immediate: true });
 </script>
 
 <template>
@@ -106,7 +106,7 @@ onMounted(loadWeek);
 
     <section class="panel alpha-card">
       <h2>Assignment schedule</h2>
-      <label>Week starting<input v-model="week" type="date" required :disabled="busy" @change="loadWeek"></label>
+      <label>Week starting<input v-model="week" type="date" required :disabled="busy"></label>
       <button class="button button-primary" :disabled="busy || !week" @click="run(autoSchedule)">Assign available residents</button>
       <p v-if="!assignments.length && !busy">No assignments in this week.</p>
       <template v-else-if="assignments.length">

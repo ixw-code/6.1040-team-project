@@ -146,9 +146,9 @@ addBatch(group: Group, item: Item, category?: Category, weight: Number, interval
   where weight is nonfinite or outside [1, 10]
   then
     refuses TASK_WEIGHT_INVALID "Task weight must be between 1 and 10."
-  where the batch has fewer than 1 or more than 104 intervals, any interval has invalid start or end times, or the supplied zone is invalid
+  where the batch has fewer than 1 or more than 104 intervals, any interval has invalid start or end times, the supplied zone is invalid, or weekly intervals overlap
   then
-    refuses TASK_INTERVAL_INVALID "Provide between 1 and 104 valid task intervals."
+    refuses TASK_INTERVAL_INVALID "Provide between 1 and 104 valid task intervals with no overlap between weekly occurrences."
   where the batch is valid and the group has already used the request ID
   then
     use the task IDs from the original batch
@@ -204,7 +204,7 @@ updateInterval(task: Task, interval?: Interval): returns (task: Task)
   where task is already completed 
   then
     refuses TASK_STATUS_CONFLICT "A completed task cannot be rescheduled."
-  where any of the following holds: interval is given and a timestamp is invalid or start is not before its end; interval is given and task deadline is before interval's end; interval is None and either the task deadline is None or the task belongs to a weekly assignment
+  where any of the following holds: interval is given and a timestamp is invalid or start is not before its end; interval is given and task deadline is before interval's end; interval is None and either the task deadline is None or the task belongs to a weekly assignment; interval overlaps another occurrence of the same weekly assignment
   then
     refuses TASK_INTERVAL_INVALID "Provide a valid interval that ends by the deadline, or keep a deadline when clearing a standalone interval."
   where interval is None and task has a deadline and is standalone

@@ -1,5 +1,5 @@
 import { MongoServerError, type Db } from "mongodb";
-import { maxAssignmentOccurrences, weekdays } from "../../shared/assignmentDates.ts";
+import { assignmentWindowsOverlap, maxAssignmentOccurrences, weekdays } from "../../shared/assignmentDates.ts";
 
 import { isTimeZone, isWeeklyAvailability, type AvailabilityLevel, type WeekAvailability } from "../../shared/weeklyAvailability.ts";
 
@@ -330,6 +330,9 @@ export class TaskSchedulingConcept {
       || intervals.some(({ start, end }) => !validInterval(start, end))) {
       throw new TaskIntervalInvalid(`Provide between 1 and ${maxAssignmentOccurrences} valid task intervals.`);
     }
+    if (repeatWeekly && assignmentWindowsOverlap(intervals)) {
+      throw new TaskIntervalInvalid("Weekly occurrences must not overlap.");
+    }
 
     if (timeZone != null && !isTimeZone(timeZone)) throw new TaskIntervalInvalid("Provide a valid time zone for the task.");
 
@@ -384,16 +387,20 @@ export class TaskSchedulingConcept {
   async updateInterval({ task, interval }: TaskRef & { interval?: Interval }): Promise<TaskRef> {
     return this.#updateTask(task, (entry, state) => {
       if (isCompleted(entry)) throw new TaskStatusConflict("A completed task cannot be rescheduled.");
-      const batch = recurringAssignments(state).get(entry)?.batch;
-      if (!validTiming(entry.deadline, interval) || (batch && interval === undefined)) {
+      const series = recurringAssignments(state).get(entry);
+      if (!validTiming(entry.deadline, interval) || (series && interval === undefined)) {
         throw new TaskIntervalInvalid("Provide a valid interval that ends by the deadline, or keep a deadline when clearing a standalone interval.");
       }
       if (interval === undefined) {
         delete entry.interval;
         clearAssignment(entry);
       } else {
+        if (series?.tasks.some(other => other !== entry && !other.archived && other.interval
+          && interval.start < other.interval.end && interval.end > other.interval.start)) {
+          throw new TaskIntervalInvalid("Weekly occurrences must not overlap.");
+        }
         entry.interval = interval;
-        if (batch) batch.repeatWeekly = true;
+        if (series?.batch) series.batch.repeatWeekly = true;
         else if (entry.assignee !== undefined && availabilityFor(state, entry.assignee, entry) === 0) clearAssignment(entry);
       }
       return { task };

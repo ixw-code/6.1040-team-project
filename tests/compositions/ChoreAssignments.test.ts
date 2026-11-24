@@ -4,6 +4,7 @@ import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { assembleApplication } from "../../src/assembly.ts";
 import { policy } from "../../src/http.ts";
 import { TaskSchedulingConcept } from "../../src/concepts/TaskScheduling/TaskScheduling.ts";
+import { maxAssignmentOccurrences } from "../../src/shared/assignmentDates.ts";
 import type { WeekAvailability } from "../../src/shared/weeklyAvailability.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";
 
@@ -251,6 +252,45 @@ describe("ChoreAssignments", () => {
     expect(await request("list", { from: at(1), until: nextWeek(4) }, owner.cookie)).toMatchObject({
       status: 200, body: { assignments: [{ task: tasks[0].task, weekly: true, occurrences: 2 }] },
     });
+  });
+
+  test("rejects overlapping weekly occurrences atomically and enforces the occurrence limit", async () => {
+    const { request, owner, chore, application, household } = await setup();
+    const scheduling = application.concepts.TaskScheduling;
+    const batchId = crypto.randomUUID();
+    const create = (windows: object[]) => request("tasks/create-batch", {
+      chore, batchId, windows, repeatWeekly: true, flexibleDays: true, timeZone: "UTC",
+    }, owner.cookie);
+    const first = { start: "2027-01-04T00:00:00Z", end: "2027-01-12T00:00:00Z" };
+    const second = { start: "2027-01-11T00:00:00Z", end: "2027-01-19T00:00:00Z" };
+    for (const invalid of [[], [first, first], [second, first], [
+      { start: "2027-02-29T00:00:00Z", end: "2027-03-01T00:00:00Z" },
+    ]]) {
+      expect((await create(invalid)).status).toBe(400);
+    }
+    expect(await scheduling._tasks({ group: household })).toEqual([]);
+
+    const windows = Array.from({ length: maxAssignmentOccurrences + 1 }, (_, week) => ({
+      start: new Date(Date.UTC(2027, 0, 4 + week * 7)).toISOString(),
+      end: new Date(Date.UTC(2027, 0, 11 + week * 7)).toISOString(),
+    }));
+    expect((await create(windows)).status).toBe(400);
+    const valid = await create(windows.slice(0, maxAssignmentOccurrences));
+    expect(valid.status).toBe(200);
+    expect(valid.body.tasks).toHaveLength(maxAssignmentOccurrences);
+    expect(new Set(valid.body.tasks.map(({ task }: { task: string }) => task)).size).toBe(maxAssignmentOccurrences);
+
+    const [firstTask, secondTask] = valid.body.tasks;
+    expect((await request("tasks/interval", { ...secondTask, interval: {
+      start: "2027-01-10T23:59:59Z", end: windows[1].end,
+    } }, owner.cookie)).status).toBe(400);
+    expect(await scheduling._get(secondTask)).toMatchObject([{ interval: {
+      start: new Date(windows[1].start), end: new Date(windows[1].end),
+    } }]);
+    expect((await request("tasks/delete", firstTask, owner.cookie)).status).toBe(200);
+    expect(await create(windows.slice(0, maxAssignmentOccurrences))).toMatchObject({ status: 200, body: valid.body });
+    expect(await request("list", { from: windows[0].start, until: windows[maxAssignmentOccurrences - 1].end }, owner.cookie))
+      .toMatchObject({ status: 200, body: { assignments: [] } });
   });
 
   test("counts a weekly series once and keeps one assignee through its open dates", async () => {

@@ -13,10 +13,11 @@
     "vue": "^3.5.43"
   },
   "devDependencies": {
-    "typescript": ">=6 <7",
     "@types/bun": "^1.3.4",
     "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^6.0.10",
+    "playwright": "1.62.1",
+    "typescript": ">=6 <7",
     "vite": "^8.3.4",
     "vue-tsc": "^3.3.13"
   },
@@ -27,6 +28,7 @@
     "check:frontend": "vue-tsc --noEmit -p web/tsconfig.json",
     "start": "bun src/main.ts",
     "check:design": "sync-engine check-design design/concepts/*.md design/types.md design/compositions/*.md",
+    "test:browser": "bun tests/browser/alpha.smoke.ts",
     "dev": "bun run db:up && bun run --parallel dev:backend dev:frontend",
     "dev:backend": "bun --watch src/main.ts",
     "dev:frontend": "bun --bun vite --config web/vite.config.ts",

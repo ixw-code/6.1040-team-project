@@ -41,12 +41,12 @@ onMounted(reload);
     <button v-for="item in overseer ? ['Manage', 'Chore catalog', 'Review queue', 'My board', 'Settings'] : ['My board', 'Settings']" :key="item" :aria-pressed="tab === item" @click="tab = item">{{ item }}</button>
   </nav>
   <p v-if="!ready && !error">Loading household…</p>
-  <template v-if="ready" :key="version">
+  <div v-if="ready" :key="version">
     <ManageHousehold v-if="overseer && tab === 'Manage'" v-model:week="assignmentWeek" />
     <ChoreCatalog v-else-if="overseer && tab === 'Chore catalog'"
       @created="assignmentWeek = $event" @view-assignments="tab = 'Manage'" />
     <ReviewQueue v-else-if="overseer && tab === 'Review queue'" />
     <HouseholdSettings v-else-if="tab === 'Settings'" @changed="emit('changed')" />
     <ResidentApp v-else />
-  </template>
+  </div>
 </template>

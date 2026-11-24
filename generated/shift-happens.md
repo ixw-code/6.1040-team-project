@@ -234,7 +234,7 @@ Defined in [TaskScheduling](../design/concepts/TaskScheduling.md), line 1.
   - Refuses `TASK_INTERVAL_INVALID`: Provide a deadline or a valid interval that ends by the deadline when both are given.
 - `addBatch(group: Group, item: Item, category?: Category, weight: Number, intervals: IntervalSet, batchId: String, repeatWeekly?: Flag, flexibleDays?: Flag, timeZone?: String) : returns (tasks: TaskSet)`
   - Refuses `TASK_WEIGHT_INVALID`: Task weight must be between 1 and 10.
-  - Refuses `TASK_INTERVAL_INVALID`: Provide between 1 and 104 valid task intervals.
+  - Refuses `TASK_INTERVAL_INVALID`: Provide between 1 and 104 valid task intervals with no overlap between weekly occurrences.
 - `archiveAssignment(group: Group, task: Task) : returns (task: Task)`
   - Refuses `TASK_NOT_FOUND`: This task doesn't exist in the schedule.
 - `remove(task: Task) : returns (task: Task)`

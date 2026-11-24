@@ -11,13 +11,6 @@ import { accountRequests } from "../helpers/accounts.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";
 
 const url = "http://127.0.0.1";
-const sinkTask = "demo-sink";
-const firstSinkTask = "demo-first-sink";
-const nextSinkTask = "demo-next-sink";
-const weekendTask = "demo-weekend";
-const otherTask = "demo-other-sink";
-const household = "demo-house";
-const otherHousehold = "demo-other-house";
 const notFound = { status: 404, body: { error: "NOT_FOUND" } };
 const notOpen = { status: 409, body: { error: "SUBMISSION_NOT_OPEN" } };
 const closed = { status: 409, body: { error: "SUBMISSION_CLOSED" } };
@@ -25,7 +18,13 @@ const png = Uint8Array.from(Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l2QAAAAASUVORK5CYII=", "base64",
 ));
 
-function completionFixtures(users: { alice: string; sam: string; reviewer: string; otherReviewer: string }) {
+function completionFixtures(label: string, users: { alice: string; sam: string; reviewer: string; otherReviewer: string }) {
+  const sinkTask = `${label}-sink`;
+  const nextSinkTask = `${label}-next-sink`;
+  const weekendTask = `${label}-weekend`;
+  const otherTask = `${label}-other-sink`;
+  const household = `${label}-house`;
+  const otherHousehold = `${label}-other-house`;
   const roles = new Map<string, "RESIDENT" | "OVERSEER">([
     [`${household}/${users.alice}`, "RESIDENT"],
     [`${household}/${users.sam}`, "RESIDENT"],
@@ -48,7 +47,6 @@ function completionFixtures(users: { alice: string; sam: string; reviewer: strin
   };
   const tasks = new Map([
     [sinkTask, sink],
-    [firstSinkTask, { ...sink, task: firstSinkTask }],
     [nextSinkTask, {
       ...sink, task: nextSinkTask, dueAt: new Date("2026-12-08T23:59:00-05:00"),
       interval: { start: new Date("2026-12-08T00:00:00-05:00"), end: new Date("2026-12-08T23:59:00-05:00") },
@@ -72,7 +70,7 @@ function completionFixtures(users: { alice: string; sam: string; reviewer: strin
       if (!existing) completions.set(completion.task, completion);
     },
   };
-  return { hooks, completions };
+  return { hooks, completions, sinkTask, nextSinkTask, weekendTask, otherTask, household, otherHousehold };
 }
 
 function requests(handler: ReturnType<typeof createCompletionHandler>) {
@@ -105,7 +103,7 @@ describe("CompletionChecking HTTP", () => {
       session("register", `${label}-sam`),
       session("register", `${label}-other-reviewer`),
     ]);
-    const { hooks, completions } = completionFixtures({
+    const fixtures = completionFixtures(label, {
       alice: alice.user, reviewer: reviewer.user, sam: sam.user, otherReviewer: otherReviewer.user,
     });
     const photos = createPhotoStore(database());
@@ -121,12 +119,12 @@ describe("CompletionChecking HTTP", () => {
 
     let now = new Date("2026-12-01T12:00:00-05:00");
     const setTime = (iso: string) => { now = new Date(iso); };
-    const completion = (dependencies = hooks) => requests(createCompletionHandler(application.concepts, photos, dependencies, () => now));
-    return { application, hooks, completions, completion, upload, alice, reviewer, sam, otherReviewer, setTime };
+    const completion = (dependencies = fixtures.hooks) => requests(createCompletionHandler(application.concepts, photos, dependencies, () => now));
+    return { ...fixtures, application, completion, upload, alice, reviewer, sam, otherReviewer, setTime };
   }
 
   test("attaches a resident's upload, permits its household Overseer to view it, and awards credit once", async () => {
-    const { completion, upload, application, completions, alice, reviewer, sam, otherReviewer } = await setup("review");
+    const { completion, upload, application, completions, alice, reviewer, sam, otherReviewer, household, sinkTask } = await setup("review");
     const { post, readPhoto } = completion();
     const score = () => application.concepts.Ranking._score({ group: household, person: alice.user });
     const task = sinkTask;
@@ -202,7 +200,7 @@ describe("CompletionChecking HTTP", () => {
   });
 
   test("takes the session from the cookie and conceals tasks and queues from other users", async () => {
-    const { completion, alice, reviewer, sam, otherReviewer } = await setup("access");
+    const { completion, alice, reviewer, sam, otherReviewer, household, sinkTask } = await setup("access");
     const { post } = completion();
     const task = sinkTask;
     expect(await post("get", { task, session: alice.cookie })).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
@@ -218,15 +216,15 @@ describe("CompletionChecking HTTP", () => {
   });
 
   test("checks each occurrence's window for new evidence and permits review after it closes", async () => {
-    const { completion, upload, alice, reviewer, setTime } = await setup("windows");
+    const { completion, upload, alice, reviewer, setTime, sinkTask, nextSinkTask, weekendTask } = await setup("windows");
     const { post } = completion();
     const photo = await upload(alice.cookie);
     const submit = (task: string) => post("submit", { task, photo }, alice.cookie);
 
     setTime("2026-11-30T23:59:59.999-05:00");
-    expect(await submit(firstSinkTask)).toEqual(notOpen);
+    expect(await submit(sinkTask)).toEqual(notOpen);
     setTime("2026-12-01T00:00:00-05:00");
-    expect(await submit(firstSinkTask)).toMatchObject({ status: 200 });
+    expect(await submit(sinkTask)).toMatchObject({ status: 200 });
     expect(await submit(nextSinkTask)).toEqual(notOpen);
 
     setTime("2026-12-03T23:59:59.999-05:00");
@@ -244,12 +242,12 @@ describe("CompletionChecking HTTP", () => {
     expect(await submit(weekendTask)).toEqual(closed);
 
     setTime("2026-12-08T12:00:00-05:00");
-    expect(await submit(firstSinkTask)).toEqual(closed);
+    expect(await submit(sinkTask)).toEqual(closed);
     expect(await submit(nextSinkTask)).toMatchObject({ status: 200 });
   });
 
   test("retries an approval after completion recording fails and credits only after it succeeds", async () => {
-    const { hooks, completion, upload, sam, reviewer, otherReviewer, application } = await setup("retry");
+    const { hooks, completion, upload, sam, reviewer, otherReviewer, application, otherTask, otherHousehold } = await setup("retry");
     let firstWrite = true;
     const { post } = completion({
       ...hooks,
@@ -288,7 +286,7 @@ describe("CompletionChecking HTTP", () => {
     const application = assembleApplication(database);
     const { cookie } = await accountRequests(application).session("register", "completion-awaiting-hooks");
     const { post } = requests(createCompletionHandler(application.concepts, createPhotoStore(database())));
-    expect(await post("get", { task: sinkTask })).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
-    expect(await post("get", { task: sinkTask }, cookie)).toEqual({ status: 503, body: { error: "UNAVAILABLE" } });
+    expect(await post("get", { task: "task" })).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
+    expect(await post("get", { task: "task" }, cookie)).toEqual({ status: 503, body: { error: "UNAVAILABLE" } });
   });
 });
