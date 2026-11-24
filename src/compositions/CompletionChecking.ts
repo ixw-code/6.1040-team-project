@@ -1,5 +1,6 @@
 import type { assembleApplication } from "../assembly.ts";
 import { allowsAppOrigin, signedInPerson } from "../http.ts";
+import { submissionWindowState } from "../shared/assignmentDates.ts";
 import { photoResponse, type PhotoStore } from "./Photos.ts";
 
 type CompletionConcepts = Pick<ReturnType<typeof assembleApplication>["concepts"], "PhotoChecking" | "Ranking" | "Sessioning">;
@@ -14,6 +15,7 @@ export type CompletionTask = {
   photoInstructions: string;
   baseline: string;
   dueAt: Date;
+  interval?: { start: Date; end: Date };
   active: boolean;
   archived?: boolean;
   completed: boolean;
@@ -105,6 +107,7 @@ export function createCompletionHandler(
   { PhotoChecking, Ranking, Sessioning }: CompletionConcepts,
   photos: PhotoStore,
   hooks?: CompletionHooks,
+  now = () => new Date(),
 ) {
   async function readCompletion(task: CompletionTask, person: string, role: HouseholdRole) {
     const attempts = await PhotoChecking._history({ subject: task.task });
@@ -183,9 +186,14 @@ export function createCompletionHandler(
           if (!task?.active || task.completed || task.assignee !== person || !await hooks.role(task.household, person)) {
             return failure(404);
           }
-          if (!await photos.owns(input.photo, person)) return failure(404);
+          if (!task.interval || !await photos.owns(input.photo, person)) return failure(404);
+          const submittedAt = now();
+          const state = submissionWindowState(task.interval, submittedAt.getTime());
+          if (state !== "open") {
+            return json({ error: state === "upcoming" ? "SUBMISSION_NOT_OPEN" : "SUBMISSION_CLOSED" }, 409);
+          }
           const result = await PhotoChecking.submit({
-            subject: task.task, person, photo: input.photo, criteria: task.criteria, baseline: task.baseline, method: "MANUAL",
+            subject: task.task, person, photo: input.photo, criteria: task.criteria, baseline: task.baseline, method: "MANUAL", submittedAt,
           });
           return "error" in result ? refusal(result.error) : json(result);
         }

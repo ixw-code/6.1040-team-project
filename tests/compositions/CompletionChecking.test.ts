@@ -12,10 +12,15 @@ import { useMongoTestDb } from "../helpers/mongo.ts";
 
 const url = "http://127.0.0.1";
 const sinkTask = "demo-sink";
+const firstSinkTask = "demo-first-sink";
+const nextSinkTask = "demo-next-sink";
+const weekendTask = "demo-weekend";
 const otherTask = "demo-other-sink";
 const household = "demo-house";
 const otherHousehold = "demo-other-house";
 const notFound = { status: 404, body: { error: "NOT_FOUND" } };
+const notOpen = { status: 409, body: { error: "SUBMISSION_NOT_OPEN" } };
+const closed = { status: 409, body: { error: "SUBMISSION_CLOSED" } };
 const png = Uint8Array.from(Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l2QAAAAASUVORK5CYII=", "base64",
 ));
@@ -36,12 +41,22 @@ function completionFixtures(users: { alice: string; sam: string; reviewer: strin
     criteria: "The sink and dish rack are empty.",
     photoInstructions: "Show the whole sink and dish rack.",
     baseline: "demo-sink-baseline.jpg",
-    dueAt: new Date("2026-12-01T00:00:00Z"),
+    dueAt: new Date("2026-12-01T23:59:00-05:00"),
+    interval: { start: new Date("2026-12-01T00:00:00-05:00"), end: new Date("2026-12-01T23:59:00-05:00") },
     active: true,
     completed: false,
   };
   const tasks = new Map([
     [sinkTask, sink],
+    [firstSinkTask, { ...sink, task: firstSinkTask }],
+    [nextSinkTask, {
+      ...sink, task: nextSinkTask, dueAt: new Date("2026-12-08T23:59:00-05:00"),
+      interval: { start: new Date("2026-12-08T00:00:00-05:00"), end: new Date("2026-12-08T23:59:00-05:00") },
+    }],
+    [weekendTask, {
+      ...sink, task: weekendTask, title: "Clean the kitchen", dueAt: new Date("2026-12-06T23:59:00-05:00"),
+      interval: { start: new Date("2026-12-04T00:00:00-05:00"), end: new Date("2026-12-06T23:59:00-05:00") },
+    }],
     [otherTask, { ...sink, task: otherTask, household: otherHousehold, assignee: users.sam }],
   ]);
   const completions = new Map<string, TaskCompletion>();
@@ -104,8 +119,10 @@ describe("CompletionChecking HTTP", () => {
       return (await response.json() as { photo: string }).photo;
     }
 
-    const completion = (dependencies = hooks) => requests(createCompletionHandler(application.concepts, photos, dependencies));
-    return { application, hooks, completions, completion, upload, alice, reviewer, sam, otherReviewer };
+    let now = new Date("2026-12-01T12:00:00-05:00");
+    const setTime = (iso: string) => { now = new Date(iso); };
+    const completion = (dependencies = hooks) => requests(createCompletionHandler(application.concepts, photos, dependencies, () => now));
+    return { application, hooks, completions, completion, upload, alice, reviewer, sam, otherReviewer, setTime };
   }
 
   test("attaches a resident's upload, permits its household Overseer to view it, and awards credit once", async () => {
@@ -198,6 +215,37 @@ describe("CompletionChecking HTTP", () => {
     expect(await post("review-queue", { household }, alice.cookie)).toEqual(notFound);
     expect(await post("review-queue", { household }, otherReviewer.cookie)).toEqual(notFound);
     expect(await post("review", { submission: "unknown", decision: "APPROVE" }, reviewer.cookie)).toEqual(notFound);
+  });
+
+  test("checks each occurrence's window for new evidence and permits review after it closes", async () => {
+    const { completion, upload, alice, reviewer, setTime } = await setup("windows");
+    const { post } = completion();
+    const photo = await upload(alice.cookie);
+    const submit = (task: string) => post("submit", { task, photo }, alice.cookie);
+
+    setTime("2026-11-30T23:59:59.999-05:00");
+    expect(await submit(firstSinkTask)).toEqual(notOpen);
+    setTime("2026-12-01T00:00:00-05:00");
+    expect(await submit(firstSinkTask)).toMatchObject({ status: 200 });
+    expect(await submit(nextSinkTask)).toEqual(notOpen);
+
+    setTime("2026-12-03T23:59:59.999-05:00");
+    expect(await submit(weekendTask)).toEqual(notOpen);
+    setTime("2026-12-06T23:59:00-05:00");
+    const weekend = await submit(weekendTask);
+    expect(weekend).toMatchObject({ status: 200 });
+    expect(await post("get", { task: weekendTask }, alice.cookie)).toMatchObject({
+      body: { completion: { current: [{ submittedAt: "2026-12-07T04:59:00.000Z" }] } },
+    });
+    setTime("2026-12-06T23:59:00.001-05:00");
+    expect(await post("review", {
+      submission: weekend.body.submission, decision: "REJECT", feedback: "Include the counter.",
+    }, reviewer.cookie)).toMatchObject({ status: 200 });
+    expect(await submit(weekendTask)).toEqual(closed);
+
+    setTime("2026-12-08T12:00:00-05:00");
+    expect(await submit(firstSinkTask)).toEqual(closed);
+    expect(await submit(nextSinkTask)).toMatchObject({ status: 200 });
   });
 
   test("retries an approval after completion recording fails and credits only after it succeeds", async () => {

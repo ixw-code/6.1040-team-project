@@ -18,26 +18,30 @@ export function mondayOf(value: string): string {
   return dateString(date);
 }
 
-// Advance calendar dates first. Convert to local instants only after choosing the dates
-// so a weekly 9 AM assignment stays at 9 AM when clocks change.
-export function assignmentDates(weekday: number, from: string, through: string): string[] {
-  if (!from || !through || through < from) return [];
-  const day = calendarDay(from);
-  const end = calendarDay(through);
-  day.setUTCDate(day.getUTCDate() + (weekday - day.getUTCDay() + 7) % 7);
+export type AssignmentDates = { startsOn: string; endsOn: string };
 
-  const dates: string[] = [];
-  while (day <= end && dates.length <= maxAssignmentOccurrences) {
-    dates.push(dateString(day));
-    day.setUTCDate(day.getUTCDate() + 7);
-  }
-  return dates;
+export function submissionWindowState(window: { start: Date | string; end: Date | string }, now: number) {
+  if (now < new Date(window.start).getTime()) return "upcoming";
+  if (now > new Date(window.end).getTime()) return "closed";
+  return "open";
 }
 
-export function assignmentInWeek(weekday: number, dateInWeek: string): string {
-  const date = calendarDay(mondayOf(dateInWeek));
-  date.setUTCDate(date.getUTCDate() + (weekday + 6) % 7);
-  return dateString(date);
+// Repeat whole calendar windows so local times stay steady across clock changes.
+export function assignmentWindows(first: AssignmentDates, repeatThrough?: string): AssignmentDates[] {
+  const { startsOn, endsOn } = first;
+  if (!startsOn || !endsOn || endsOn < startsOn) return [];
+  if (repeatThrough === undefined) return [first];
+
+  const start = calendarDay(startsOn);
+  const end = calendarDay(endsOn);
+  const limit = calendarDay(repeatThrough);
+  const windows: AssignmentDates[] = [];
+  while (end <= limit && windows.length <= maxAssignmentOccurrences) {
+    windows.push({ startsOn: dateString(start), endsOn: dateString(end) });
+    start.setUTCDate(start.getUTCDate() + 7);
+    end.setUTCDate(end.getUTCDate() + 7);
+  }
+  return windows;
 }
 
 export function localAssignmentTime(day: string, time: string): Date {

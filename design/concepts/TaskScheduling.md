@@ -96,6 +96,7 @@ a set of Tasks with
   an optional completedAt DateTime
   an optional archived Flag
   an optional timeZone String
+  an optional flexibleDays Flag
 
 Rule: all stored timestamps are valid DateTime values
 Rule: every interval must have start before end
@@ -105,9 +106,10 @@ Rule: a task's weight is a positive float between 1-10, inclusive
 Rule: a task has an assignee exactly when it has a source
 Rule: a task with an assignee must have a scheduled interval
 Rule: a task must have either a deadline or a scheduled interval
-Rule: a saved weekly pattern determines availability on the day a task starts in its scheduling time zone
+Rule: a saved weekly pattern determines availability on the day a specific-day task starts in its scheduling time zone
+Rule: a flexible task uses the highest availability level across days with time inside its window
 Rule: for tasks without a stored zone, use the resident's saved zone
-Rule: if a resident has no weekly pattern, retain the existing interval coverage rule
+Rule: if a resident has no weekly pattern, a flexible task requires an overlapping availability interval and a specific-day task requires full interval coverage
 Rule: assigned standalone pending tasks require an available or somewhat available day, or legacy interval coverage
 Rule: weekly assignments keep the same assignee across their open occurrences until an overseer makes another assignment decision or the assignee leaves
 Rule: completed occurrences retain their recorded completion when open occurrences change assignee
@@ -140,7 +142,7 @@ add(group: Group, item: Item, category?: Category, weight: Number, deadline?: Da
       no completedBy, and no completedAt
     returns task
 
-addBatch(group: Group, item: Item, category?: Category, weight: Number, intervals: IntervalSet, batchId: String, repeatWeekly?: Flag, timeZone?: String): returns (tasks: TaskSet)
+addBatch(group: Group, item: Item, category?: Category, weight: Number, intervals: IntervalSet, batchId: String, repeatWeekly?: Flag, flexibleDays?: Flag, timeZone?: String): returns (tasks: TaskSet)
   where weight is nonfinite or outside [1, 10]
   then
     refuses TASK_WEIGHT_INVALID "Task weight must be between 1 and 10."
@@ -154,7 +156,7 @@ addBatch(group: Group, item: Item, category?: Category, weight: Number, interval
   where the batch is valid and the request ID is new for the group
   then
     atomically create one unassigned task per interval with the same item, category and weight
-    set each deadline to the end of its interval and record the zone when supplied
+    set each deadline to the end of its interval and record the zone and flexible-day status when supplied
     save the task IDs and whether they form one weekly assignment with the request ID
     returns tasks
 
@@ -271,7 +273,7 @@ autoSchedule(group: Group, from: DateTime, until: DateTime, people: PersonSet, p
     refuses PREFERENCES_INVALID "The supplied preferences are invalid."
   where [from, until) is a valid interval
   then
-    consider each assignment with an open occurrence whose interval starts in [from, until)
+    consider each assignment with an open occurrence whose interval starts in [from, until) or overlaps it as a flexible window
     if onlyUnassigned is false, clear automatic assignments on all open occurrences of any considered assignment without manual assignees
     process assignments in order of their first open occurrence in the window
     skip assignments with any remaining assignee
@@ -317,7 +319,7 @@ reset(group: Group, from: DateTime, until: DateTime) : returns (cleared: TaskSet
     refuses SCHEDULE_WINDOW_INVALID "The period must end after it starts."
   where from is before until
   then
-    consider assignments with an open occurrence whose interval starts in [from, until)
+    consider assignments with an open occurrence whose interval starts in [from, until) or overlaps it as a flexible window
     if the assignment has no manual assignee, clear assignee and source from all its open automatic occurrences
     returns cleared
 
@@ -354,10 +356,10 @@ uncomplete(task: Task): returns (task: Task, lastCompletedBy: Person, lastComple
 
 ## Queries
 ```queries
-_assignments(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, weekly: Flag, occurrences: Number, remaining: Number, mixed: Flag, assignee: Person, startsAt: DateTime, endsAt: DateTime)
+_assignments(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, weekly: Flag, occurrences: Number, remaining: Number, mixed: Flag, assignee: Person, startsAt: DateTime, firstWindowEndsAt: DateTime, endsAt: DateTime, flexibleDays: Flag, timeZone: String)
   Returns one row per visible standalone or weekly assignment with at least one occurrence in the requested window. Weekly rows summarize the whole series.
 
-_get(task: Task) : optional (group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime, archived?: Flag, timeZone?: String)
+_get(task: Task) : optional (group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime, archived?: Flag, timeZone?: String, flexibleDays?: Flag)
   Returns task details if task exists, or no rows otherwise.
 
 _activeTask(task: Task) : optional (group: Group)
@@ -367,7 +369,7 @@ _tasks(group: Group) : many (task: Task, item: Item, category?: Category, weight
   Returns all tasks belonging to a group, ordered by interval start when present, otherwise by deadline, with ties broken by task identity. Returns no rows when none match.
 
 _schedule(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, category?: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)
-  Returns all visible tasks in group with their scheduled interval start or their deadline in [from, until), ordered as in _tasks. Returns no rows when none match.
+  Returns all visible tasks in group with their scheduled interval start or their deadline in [from, until), or a flexible window overlapping that period, ordered as in _tasks. Returns no rows when none match.
 
 _pending(group: Group, asOf: DateTime) : many (task: Task, item: Item, assignee?: Person, interval?: Interval, deadline?: DateTime, status: Status)
   Returns all incomplete tasks with interval starts or deadlines after asOf, along with a PENDING or OVERDUE status by comparing the current time to the interval end when present, otherwise to the deadline. Orders rows as in _tasks and returns no rows when none match.

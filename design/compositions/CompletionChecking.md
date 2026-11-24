@@ -8,11 +8,13 @@ PhotoChecking stores submissions and decisions. TaskScheduling records task comp
 
 A signed-in resident can submit evidence for an active task assigned to them in their household. The submission endpoint checks the session and assignment before recording the photo. The session identifies the submitter, so a resident cannot submit under another person’s identity.
 
+The server accepts evidence from the scheduled start through the scheduled end of that task occurrence. Each occurrence of a weekly assignment has its own window. An early submission receives `SUBMISSION_NOT_OPEN`, and a late submission receives `SUBMISSION_CLOSED`. The server records the time it used to make this check.
+
 The resident uploads the image first and receives a photo ID. Submitting that ID attaches the stored image to the task after CompletionChecking verifies that the signed-in resident uploaded it.
 
 The resident opens the task to see its completion criteria, photo instructions, and baseline image. Submitting records the photo, submission time, a saved copy of the criteria, and baseline for that attempt. Later changes to the task’s instructions do not change how an existing submission is reviewed.
 
-A new submission starts as pending. Submitting a photo does not mark the task complete or award a point. A task with a pending or approved submission cannot receive another submission. If a submission is rejected, the resident can address the reason and submit another attempt.
+A new submission starts as pending. Submitting a photo does not mark the task complete or award a point. A task with a pending or approved submission cannot receive another submission. If a submission is rejected, the resident can address the reason and submit another attempt while that occurrence’s window is still open.
 
 Manual submissions enter the Overseer’s review queue without creating a Reasoning request.
 
@@ -34,7 +36,7 @@ Only an Overseer for the submission’s household can review it. The review endp
 
 The review queue lists current submissions awaiting manual review in that household. Each item includes the resident, task, photo, completion criteria, baseline, and submission time. The Overseer can inspect the evidence and approve or reject it from the same screen.
 
-Approval records the reviewer and review time. Rejection also requires a reason explaining what needs to be corrected or shown more clearly. The resident sees that reason and can submit another attempt. The rejected submission and its feedback remain in the history.
+Approval records the reviewer and review time. Rejection also requires a reason explaining what needs to be corrected or shown more clearly. The rejected submission and its feedback remain in the resident’s history.
 
 Only pending submissions can receive a decision. An approved submission cannot be withdrawn, changed, or reviewed again. A rejected submission keeps its decision; another attempt creates a new submission.
 

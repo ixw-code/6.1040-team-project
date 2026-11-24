@@ -30,7 +30,7 @@ export function useResidentApi() {
     return {
       id: row.task, title: row.chore?.name ?? "Chore", ownerId: row.assignee ?? "",
       start: row.interval?.start ?? row.deadline!, due: row.deadline ?? row.interval!.end,
-      end: row.interval?.end ?? row.deadline!,
+      end: row.interval?.end, flexibleDays: row.flexibleDays === true,
       status: row.completedAt || latest === "approved" ? "approved" : latest === "rejected" ? "redo" : latest === "pending" ? "submitted" : "todo",
       instructions: row.chore?.description ?? "", criteria: row.chore?.requirements?.join("\n") ?? "",
       references: (row.chore?.references ?? []).map(id => baselineUrl(row.item, id)), attempts,

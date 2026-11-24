@@ -13,9 +13,15 @@ const busy = ref(false);
 const message = ref("");
 const error = ref("");
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
-const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long" });
-const calendarDate = (date: string) => dateFormat.format(new Date(date));
+const calendarDate = (date: string, timeZone: string | null) =>
+  new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: timeZone ?? undefined }).format(new Date(date));
+function weeklyDays(row: AssignmentRow) {
+  const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: row.timeZone ?? undefined });
+  const first = weekday.format(new Date(row.startsAt));
+  if (!row.flexibleDays) return first;
+  const last = weekday.format(new Date(new Date(row.firstWindowEndsAt).getTime() - 1));
+  return first === last ? first : `${first}–${last}`;
+}
 const dueDate = (row: AssignmentRow) => new Date(row.endsAt).toLocaleString();
 const nameOf = (id: string | null) => catalog.value.people.find(p => p.person === id)?.username ?? "Former resident";
 
@@ -47,7 +53,7 @@ async function addResident() {
 async function autoSchedule() {
   const { scheduled, unassigned } = checked(await api.assignments.weekly({ household, ...weekWindow(week.value) }));
   await loadAssignments();
-  return `${scheduled.length} assigned. ${unassigned.length} still need a resident available for all their dates.`;
+  return `${scheduled.length} assigned. ${unassigned.length} still need a resident available for each occurrence.`;
 }
 
 async function assign(row: AssignmentRow, select: HTMLSelectElement) {
@@ -110,10 +116,10 @@ onMounted(loadWeek);
             <div>
               <strong>{{ row.chore?.name ?? 'Chore' }}</strong>
               <template v-if="row.weekly">
-                <p>Weekly on {{ weekdayFormat.format(new Date(row.startsAt)) }} · {{ calendarDate(row.startsAt) }} through {{ calendarDate(row.endsAt) }}</p>
+                <p>Weekly{{ row.flexibleDays ? '' : ' on' }} {{ weeklyDays(row) }} · {{ calendarDate(row.startsAt, row.timeZone) }} through {{ calendarDate(row.endsAt, row.timeZone) }}</p>
                 <p>{{ row.occurrences - row.remaining }} of {{ row.occurrences }} dates completed</p>
               </template>
-              <p v-else>Due {{ dueDate(row) }} · {{ !row.remaining ? 'completed' : new Date(row.endsAt) < new Date() ? 'overdue' : 'pending' }}</p>
+              <p v-else><template v-if="row.flexibleDays">Opens {{ new Date(row.startsAt).toLocaleString() }} · </template>Due {{ dueDate(row) }} · {{ !row.remaining ? 'completed' : new Date(row.endsAt) < new Date() ? 'overdue' : 'pending' }}</p>
             </div>
             <div class="actions-inline">
               <span v-if="!row.remaining">{{ nameOf(row.assignee) }}</span>

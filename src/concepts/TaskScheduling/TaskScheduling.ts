@@ -1,5 +1,5 @@
 import { MongoServerError, type Db } from "mongodb";
-import { maxAssignmentOccurrences, type Weekday } from "../../shared/assignmentDates.ts";
+import { maxAssignmentOccurrences, weekdays } from "../../shared/assignmentDates.ts";
 
 import { isTimeZone, isWeeklyAvailability, type AvailabilityLevel, type WeekAvailability } from "../../shared/weeklyAvailability.ts";
 
@@ -35,9 +35,10 @@ type TaskDefinition = {
   deadline?: Date;
   interval?: Interval;
   timeZone?: string;
+  flexibleDays?: boolean;
 };
 type Task = TaskRef & TaskDefinition & Partial<Completion> & { assignee?: string; source?: Source; archived?: boolean };
-type TaskRow = Omit<Task, "interval" | "archived" | "timeZone"> & { start?: Date; end?: Date };
+type TaskRow = Omit<Task, "interval" | "archived" | "timeZone" | "flexibleDays"> & { start?: Date; end?: Date };
 type Availability = AvailabilityRef & PersonRef & { interval: Interval };
 type WeeklyAvailability = { days: WeekAvailability; timeZone: string };
 type TaskBatch = { batchId: string; tasks: TaskRef[]; repeatWeekly?: boolean };
@@ -105,24 +106,47 @@ const availabilityRank: Record<AvailabilityLevel, number> = {
   AVAILABLE: 2, SOMEWHAT_AVAILABLE: 1, NOT_AVAILABLE: 0,
 };
 
-const weekdayFormatters = new Map<string, Intl.DateTimeFormat>();
+const calendarFormatters = new Map<string, Intl.DateTimeFormat>();
+const dayInMilliseconds = 24 * 60 * 60 * 1000;
 
-function taskWeekday(start: Date, timeZone: string): Weekday {
-  let formatter = weekdayFormatters.get(timeZone);
+// A UTC midnight used only for calendar arithmetic on the local date.
+function localCalendarDay(instant: Date, timeZone: string): Date {
+  let formatter = calendarFormatters.get(timeZone);
   if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long" });
-    weekdayFormatters.set(timeZone, formatter);
+    formatter = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+    calendarFormatters.set(timeZone, formatter);
   }
-  return formatter.format(start) as Weekday;
+  const parts = formatter.formatToParts(instant);
+  const year = parts.find(part => part.type === "year")!.value.padStart(4, "0");
+  const month = parts.find(part => part.type === "month")!.value;
+  const day = parts.find(part => part.type === "day")!.value;
+  return new Date(`${year}-${month}-${day}T00:00:00Z`);
 }
 
 function availabilityFor(state: GroupState, person: string, task: Task): number {
-  if (!task.interval) return 0;
+  const { interval } = task;
+  if (!interval) return 0;
   const weekly = state.weeklyAvailability?.find(entry => entry.person === person);
-  if (weekly) {
-    return availabilityRank[weekly.days[taskWeekday(task.interval.start, task.timeZone ?? weekly.timeZone)]];
+  if (!weekly) {
+    const available = task.flexibleDays
+      ? state.availabilities.some(entry => entry.person === person
+        && entry.interval.start < interval.end && entry.interval.end > interval.start)
+      : coversInterval(state, person, interval);
+    return available ? availabilityRank.AVAILABLE : 0;
   }
-  return coversInterval(state, person, task.interval) ? availabilityRank.AVAILABLE : 0;
+
+  const timeZone = task.timeZone ?? weekly.timeZone;
+  const first = localCalendarDay(interval.start, timeZone);
+  if (!task.flexibleDays) return availabilityRank[weekly.days[weekdays[first.getUTCDay()]]];
+  // An end at midnight leaves no time to work on the following day.
+  const last = localCalendarDay(new Date(interval.end.getTime() - 1), timeZone);
+  const dayCount = Math.min(7, (last.getTime() - first.getTime()) / dayInMilliseconds + 1);
+  let best = 0;
+  for (let offset = 0; offset < dayCount && best < availabilityRank.AVAILABLE; offset++) {
+    const day = weekdays[(first.getUTCDay() + offset) % 7];
+    best = Math.max(best, availabilityRank[weekly.days[day]]);
+  }
+  return best;
 }
 
 function clearAssignments(tasks: Task[], matches: (task: Task) => boolean): TaskRef[] {
@@ -201,7 +225,7 @@ function openTasks(assignment: Assignment): Task[] {
 }
 
 function touchesWindow(open: Task[], window: Window): boolean {
-  return open.some(task => inWindow(task.interval?.start, window));
+  return open.some(task => scheduledInWindow(task, window));
 }
 
 function canReset(open: Task[]): boolean {
@@ -222,7 +246,12 @@ function inWindow(value: Date | undefined, { from, until }: Window): boolean {
   return value !== undefined && value >= from && value < until;
 }
 
-function taskRow({ interval, archived: _archived, timeZone: _timeZone, ...task }: Task): TaskRow {
+function scheduledInWindow(task: Task, window: Window): boolean {
+  if (task.flexibleDays && task.interval) return task.interval.start < window.until && task.interval.end > window.from;
+  return inWindow(task.interval?.start, window);
+}
+
+function taskRow({ interval, archived: _archived, timeZone: _timeZone, flexibleDays: _flexibleDays, ...task }: Task): TaskRow {
   return interval ? { ...task, start: interval.start, end: interval.end } : task;
 }
 
@@ -273,7 +302,7 @@ export class TaskSchedulingConcept {
     return state?.tasks ?? [];
   }
 
-  async add({ group, item, category, weight, deadline, interval }: GroupRef & Omit<TaskDefinition, "timeZone">): Promise<TaskRef> {
+  async add({ group, item, category, weight, deadline, interval }: GroupRef & Omit<TaskDefinition, "timeZone" | "flexibleDays">): Promise<TaskRef> {
     requireWeight(weight);
     if (!validTiming(deadline, interval)) {
       throw new TaskIntervalInvalid("Provide a deadline or a valid interval that ends by the deadline when both are given.");
@@ -288,11 +317,12 @@ export class TaskSchedulingConcept {
     }, true);
   }
 
-  async addBatch({ group, item, category, weight, intervals, batchId, repeatWeekly = false, timeZone }: GroupRef
+  async addBatch({ group, item, category, weight, intervals, batchId, repeatWeekly = false, flexibleDays = false, timeZone }: GroupRef
     & Pick<TaskDefinition, "item" | "category" | "weight"> & {
       intervals: Interval[];
       batchId: string;
       repeatWeekly?: boolean;
+      flexibleDays?: boolean;
       timeZone?: string | null;
     }): Promise<{ tasks: TaskRef[] }> {
     requireWeight(weight);
@@ -307,6 +337,7 @@ export class TaskSchedulingConcept {
       task: crypto.randomUUID(), item, weight, deadline: interval.end, interval,
       ...(category !== undefined && { category }),
       ...(timeZone != null && { timeZone }),
+      ...(flexibleDays && { flexibleDays }),
     }));
     const tasks = entries.map(({ task }) => ({ task }));
     return this.#update(group, state => {
@@ -511,7 +542,7 @@ export class TaskSchedulingConcept {
     return this.#update(group, (state) => {
       const selected = assignments(state).flatMap(assignment => {
         const open = openTasks(assignment);
-        const task = open.find(task => inWindow(task.interval?.start, window));
+        const task = open.find(task => scheduledInWindow(task, window));
         return task ? [{ task, open }] : [];
       }).sort((left, right) => taskOrder(left.task, right.task));
 
@@ -611,7 +642,7 @@ export class TaskSchedulingConcept {
     const rows = (state ? assignments(state) : []).flatMap(assignment => {
       const { tasks, batch } = assignment;
       const visible = tasks.find(task => !task.archived
-        && (inWindow(task.interval?.start, window) || inWindow(task.deadline, window)));
+        && (scheduledInWindow(task, window) || inWindow(task.deadline, window)));
       if (!visible) return [];
       const open = openTasks(assignment);
       const assignees = new Set(open.map(task => task.assignee));
@@ -623,6 +654,9 @@ export class TaskSchedulingConcept {
         mixed: assignees.size > 1,
         assignee: open.length ? (assignees.size > 1 ? null : open[0].assignee ?? null) : last.completedBy ?? null,
         startsAt: taskStart(first),
+        firstWindowEndsAt: first.interval?.end ?? first.deadline!,
+        flexibleDays: Boolean(first.flexibleDays),
+        timeZone: first.timeZone ?? null,
         endsAt: last.deadline ?? last.interval!.end,
       }];
     });
@@ -648,7 +682,7 @@ export class TaskSchedulingConcept {
   async _schedule({ group, from, until }: GroupRef & Window): Promise<TaskRow[]> {
     const window = { from, until };
     return (await this.#tasks(group)).filter(task => !task.archived
-      && (inWindow(task.interval?.start, window) || inWindow(task.deadline, window))).sort(taskOrder).map(taskRow);
+      && (scheduledInWindow(task, window) || inWindow(task.deadline, window))).sort(taskOrder).map(taskRow);
   }
 
   async _pending({ group, asOf }: GroupRef & { asOf: Date }): Promise<

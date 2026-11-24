@@ -71,7 +71,7 @@ Rule: a submission's person, subject, photo, criteria, baseline, selectedMethod,
 ## Actions
 
 ```actions
-submit(person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, method: ReviewMethod) : returns (submission: Submission)
+submit(person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, method: ReviewMethod, submittedAt?: DateTime) : returns (submission: Submission)
     where the subject's current submission is pending
     then
       refuses ALREADY_PENDING "This subject already has a pending submission."
@@ -84,7 +84,7 @@ submit(person: Person, subject: Subject, photo: Photo, criteria: String, baselin
     then
       add a new submission with person, subject, photo, criteria,
         baseline, selectedMethod method, reviewMethod method,
-        status pending, submittedAt now, and empty feedback
+        status pending, the submission time supplied by the composition or now if omitted, and empty feedback
       make the new submission current for subject
       preserve earlier submissions
       returns submission

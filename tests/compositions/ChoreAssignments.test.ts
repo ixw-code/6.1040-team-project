@@ -169,6 +169,56 @@ describe("ChoreAssignments", () => {
     expect(await assign()).toMatchObject({ status: 200, body: { scheduled: [], unassigned: [first] } });
   });
 
+  test("a flexible weekend uses any permitted day and retains the same assignee across a repeat", async () => {
+    const { request, owner, resident, chore } = await setup();
+    const save = (days: Partial<WeekAvailability>, cookie: string) =>
+      request("availability/weekly/set", { days: weeklyDays(days), timeZone: "UTC" }, cookie);
+    expect((await save({ Friday: "SOMEWHAT_AVAILABLE" }, owner.cookie)).status).toBe(200);
+    expect((await save({ Sunday: "AVAILABLE" }, resident.cookie)).status).toBe(200);
+
+    const first = { start: "2027-03-12T14:00:00.000Z", end: "2027-03-15T04:00:00.000Z" };
+    const second = { start: "2027-03-19T13:00:00.000Z", end: "2027-03-22T04:00:00.000Z" };
+    function create(windows: object[], flexibleDays: boolean, repeatWeekly = false) {
+      return request("tasks/create-batch", {
+        chore, windows, flexibleDays, repeatWeekly, batchId: crypto.randomUUID(), timeZone: "America/New_York",
+      }, owner.cookie);
+    }
+    const series = await create([first, second], true, true);
+    const specific = await create([{ start: first.start, end: "2027-03-12T15:00:00Z" }], false);
+    expect(series.status).toBe(200);
+    expect(specific.status).toBe(200);
+    const [weekend, nextWeekend] = series.body.tasks;
+    const [friday] = specific.body.tasks;
+    const slice = { from: "2027-03-13T12:00:00Z", until: "2027-03-13T18:00:00.000Z" };
+    expect(await request("schedule", slice, resident.cookie)).toMatchObject({
+      status: 200, body: { tasks: [{ ...weekend, flexibleDays: true }] },
+    });
+    expect(await request("list", slice, owner.cookie)).toMatchObject({
+      status: 200, body: { assignments: [{ ...weekend, firstWindowEndsAt: first.end, flexibleDays: true, occurrences: 2 }] },
+    });
+
+    expect(await request("weekly", slice, owner.cookie)).toMatchObject({
+      status: 200, body: { scheduled: [{ ...weekend, person: resident.person }], unassigned: [] },
+    });
+    const week = { from: first.start, until: first.end };
+    expect(await request("weekly", week, owner.cookie)).toMatchObject({
+      status: 200, body: { scheduled: [{ ...friday, person: owner.person }], unassigned: [] },
+    });
+    const task = (row: { task: string }) => request("task", row, resident.cookie);
+    expect(await task(nextWeekend)).toMatchObject({
+      status: 200, body: { task: { assignee: resident.person, interval: second, flexibleDays: true } },
+    });
+
+    // A deadline at the start of Monday permits work through Sunday only.
+    await save({ Monday: "AVAILABLE" }, resident.cookie);
+    await save({ Monday: "AVAILABLE" }, owner.cookie);
+    const duplicate = await create([first], true);
+    expect(duplicate.status).toBe(200);
+    expect(await request("weekly", week, owner.cookie)).toMatchObject({
+      status: 200, body: { scheduled: [], unassigned: expect.arrayContaining([friday, ...duplicate.body.tasks]) },
+    });
+  });
+
   test("creates the whole weekly series once and rejects an invalid series without adding tasks", async () => {
     const { request, owner, resident, application, household, category, chore } = await setup();
     const nextWeek = (hour: number) => new Date(Date.UTC(2027, 0, 11, hour)).toISOString();

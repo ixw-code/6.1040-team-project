@@ -17,7 +17,8 @@ test("seven catalog chores produce fourteen tasks while preferences and completi
   const { concepts } = application;
   const store = createPhotoStore(database());
   const catalog = createCatalogHandler(concepts, store);
-  const completion = createCompletionHandler(concepts, store, completionHooks(concepts));
+  let now = new Date("2027-01-04T12:30:00Z");
+  const completion = createCompletionHandler(concepts, store, completionHooks(concepts), () => now);
   const uploads = createPhotoHandler(store, concepts.Sessioning);
   const api = createHttpHandler({ application, gateway: createGateway({ application }), policy });
   const { session } = accountRequests(application);
@@ -102,6 +103,7 @@ test("seven catalog chores produce fourteen tasks while preferences and completi
   const first = await submit();
   await post("completion/review", owner.cookie, { ...first, decision: "REJECT", feedback: "Show the rack." });
   const second = await submit();
+  now = new Date("2027-01-04T13:01:00Z");
   const approve = () => post("completion/review", owner.cookie, { ...second, decision: "APPROVE" });
   await Promise.all([approve(), approve()]);
   const { completion: recorded } = await post("completion/get", resident.cookie, { task });
@@ -146,7 +148,12 @@ test("seven catalog chores produce fourteen tasks while preferences and completi
     household, adding: true, windows: [{ start: nextStart, end: nextEnd }],
   });
   await post("assignments/set", owner.cookie, { household, entries: [{ task: nextTask, assignee: resident.user }] });
-  const pending = await post("completion/submit", resident.cookie, { task: nextTask, photo: await upload(resident.cookie, 3) });
+  const nextEvidence = { task: nextTask, photo: await upload(resident.cookie, 3) };
+  const early = await send("completion/submit", resident.cookie, nextEvidence);
+  expect(early.status).toBe(409);
+  expect(await early.json()).toEqual({ error: "SUBMISSION_NOT_OPEN" });
+  now = new Date(nextStart);
+  const pending = await post("completion/submit", resident.cookie, nextEvidence);
   await post("assignments/tasks/delete", owner.cookie, { household, task: nextTask });
   expect(await post("completion/review-queue", owner.cookie, { household })).toEqual({ queue: { items: [] } });
   expect((await send("completion/review", owner.cookie, { ...pending, decision: "APPROVE" })).status).toBe(404);

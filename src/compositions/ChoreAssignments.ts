@@ -93,18 +93,19 @@ const ChoreDetails = former(
 
 const ScheduleTaskDetails = former(
   "the display details of (task) in (household) at (asOf)",
-  ({ task, household, asOf }, { item, category, name, deadline, interval, assignee, source, completedAt, completedBy, weight, status }) =>
+  ({ task, household, asOf }, { item, category, name, deadline, interval, flexibleDays, assignee, source, completedAt, completedBy, weight, status }) =>
     where(
       TaskScheduling._get({ task }).is({ group: household, item, weight }),
       whether(TaskScheduling._get({ task }).is({ category })),
       compute(assignmentCategory, { category }, { category }),
       whether(TaskScheduling._get({ task }).is({ deadline })),
       whether(TaskScheduling._get({ task }).is({ interval })),
+      whether(TaskScheduling._get({ task }).is({ flexibleDays })),
       whether(TaskScheduling._get({ task }).is({ assignee, source })),
       whether(TaskScheduling._get({ task }).is({ completedAt, completedBy })),
       compute(assignmentStatus, { deadline, interval, completedAt, asOf }, status),
     ).form({
-      task, item, category, deadline, interval, assignee, source, completedAt, completedBy, weight, status,
+      task, item, category, deadline, interval, flexibleDays, assignee, source, completedAt, completedBy, weight, status,
       categoryName: each(HouseholdManaging._categories({ household }).is({ category, name })).first(name),
       chore: whether(ChoreDetails({ item, household })),
     }),
@@ -255,19 +256,20 @@ const CreateTaskBatch = route("tasks/create-batch", {
   batchId: value => typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(value),
   windows: value => Array.isArray(value) && value.length > 0 && value.length <= maxAssignmentOccurrences && value.every(interval),
   repeatWeekly: value => typeof value === "boolean",
+  flexibleDays: value => typeof value === "boolean",
   timeZone: nullable(isTimeZone),
-}, ({ session, requester, household, chore, batchId, windows, repeatWeekly, timeZone, intervals, category, weight, tasks }) => {
+}, ({ session, requester, household, chore, batchId, windows, repeatWeekly, flexibleDays, timeZone, intervals, category, weight, tasks }) => {
   const allowed = CanManageSchedule({ requester, household });
   const valid = ValidHouseholdChore({ chore, household });
-  return receive({ session, household, chore, batchId, windows, repeatWeekly, timeZone })
+  return receive({ session, household, chore, batchId, windows, repeatWeekly, flexibleDays, timeZone })
     .then(Sessioning.use({ session }).responds({ subject: requester })).then(
       missingHousehold(household), denied(household, allowed),
       where(allowed, no(valid.is({}))).then(respond({ error: "NOT_FOUND" })).named("missingChore"),
       where(allowed, valid.is({ category, difficulty: weight }), compute(availabilityWindows, { windows }, intervals))
-        .then(TaskScheduling.addBatch({ group: household, item: chore, category, weight, intervals, batchId, repeatWeekly, timeZone }).responds({ tasks }))
+        .then(TaskScheduling.addBatch({ group: household, item: chore, category, weight, intervals, batchId, repeatWeekly, flexibleDays, timeZone }).responds({ tasks }))
         .then(respond({ tasks })).named("created"),
     );
-}, { repeatWeekly: false, timeZone: null });
+}, { repeatWeekly: false, flexibleDays: false, timeZone: null });
 
 function taskChange(path: string, field: "deadline" | "interval" | undefined) {
   return route(path, { task: text, ...(field === "deadline" ? { deadline: nullable(date) }
@@ -366,11 +368,11 @@ const GetSchedule = route("schedule", windowFields, ({ session, requester, house
 
 const AssignmentList = former(
   "the assignments of (household) from (from) until (until)",
-  ({ household, from, until }, { task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, endsAt }) =>
+  ({ household, from, until }, { task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, firstWindowEndsAt, endsAt, flexibleDays, timeZone }) =>
     each(TaskScheduling._assignments({ group: household, from, until })
-      .is({ task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, endsAt }))
+      .is({ task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, firstWindowEndsAt, endsAt, flexibleDays, timeZone }))
       .form({
-        task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, endsAt,
+        task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, firstWindowEndsAt, endsAt, flexibleDays, timeZone,
         chore: whether(ChoreDetails({ item, household })),
       }),
 );

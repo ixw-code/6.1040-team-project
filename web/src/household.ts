@@ -31,6 +31,8 @@ const messages: Record<string, string> = {
   CHORE_ORDER_INVALID: "Place each chore in the ranking once.",
   CHORE_NAME_CONFLICT: "A chore with that name already exists.", HOUSEHOLD_RESIDENT_CONFLICT: "This resident is already a member.",
   INVALID_REQUEST: "Check your entries and try again.", CONFLICT: "The request conflicts with the current household or schedule.",
+  SUBMISSION_NOT_OPEN: "This task’s submission window hasn’t opened yet.",
+  SUBMISSION_CLOSED: "This task’s submission window has closed.",
   UNSUPPORTED_MEDIA_TYPE: "Choose a JPG, PNG, or WebP image.", PHOTO_TOO_LARGE: "Choose a photo up to 10 MB.",
   INVALID_PHOTO: "This file could not be read as an image.",
 };

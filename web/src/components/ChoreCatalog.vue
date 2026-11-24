@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import {
-  assignmentDates, assignmentInWeek, localAssignmentTime, maxAssignmentOccurrences, mondayFirstWeekdays, mondayOf,
+  assignmentWindows, localAssignmentTime, maxAssignmentOccurrences, mondayOf, type AssignmentDates,
 } from "../../../src/shared/assignmentDates.ts";
 import { api } from "../api.ts";
 import { checked, localDate, post, upload, useHousehold } from "../household.ts";
@@ -10,29 +10,32 @@ const emit = defineEmits<{ created: [week: string]; viewAssignments: [] }>();
 const { home, catalog, refresh } = useHousehold();
 const household = home.household;
 const title = ref(""), criteria = ref(""), instructions = ref("");
-const difficulty = ref(1), fileInput = ref<HTMLInputElement>(), chore = ref(""), start = ref(""), due = ref("");
-const today = new Date();
-const todayOnCalendar = localDate(today);
-const weekday = ref(today.getDay());
+const difficulty = ref(1), fileInput = ref<HTMLInputElement>(), chore = ref("");
+const start = ref("00:00"), due = ref("23:59");
+const today = localDate(new Date());
+const timing = ref<"day" | "range">("day");
 const frequency = ref<"once" | "weekly">("once");
-const weekDate = ref(todayOnCalendar);
-const rangeStart = ref(todayOnCalendar);
-const rangeEnd = ref("");
+const startsOn = ref(today);
+const endsOn = ref("");
+const repeatThrough = ref("");
+const lastDay = computed(() => timing.value === "range" ? endsOn.value : startsOn.value);
 const calendarFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" });
 const formatCalendarDate = (day: string) => calendarFormat.format(new Date(day + "T00:00:00Z"));
-const dates = computed(() => {
-  if (frequency.value === "weekly") return assignmentDates(weekday.value, rangeStart.value, rangeEnd.value);
-  return weekDate.value ? [assignmentInWeek(weekday.value, weekDate.value)] : [];
-});
+const dates = computed(() => assignmentWindows({ startsOn: startsOn.value, endsOn: lastDay.value },
+  frequency.value === "weekly" ? repeatThrough.value : undefined));
 const dateProblem = computed(() => {
-  if (dates.value.length > maxAssignmentOccurrences) return "Choose a range with up to 104 weekly dates.";
-  if (frequency.value === "weekly" && rangeStart.value && rangeEnd.value && !dates.value.length) {
-    return rangeEnd.value < rangeStart.value
-      ? "The end date must be on or after the start date."
-      : "There are no matching weekdays in that date range.";
+  if (startsOn.value && lastDay.value && lastDay.value < startsOn.value) return "The end date must be on or after the start date.";
+  if (frequency.value === "weekly" && repeatThrough.value && lastDay.value && repeatThrough.value < lastDay.value) {
+    return "Repeat through the end of the first assignment window or later.";
   }
+  if (dates.value.length > maxAssignmentOccurrences) return `Choose a range with up to ${maxAssignmentOccurrences} weekly occurrences.`;
   return "";
 });
+function formatWindow({ startsOn, endsOn }: AssignmentDates): string {
+  return startsOn === endsOn
+    ? `on ${formatCalendarDate(startsOn)}`
+    : `from ${formatCalendarDate(startsOn)} through ${formatCalendarDate(endsOn)}`;
+}
 let pendingBatch: { payload: string; batchId: string } | undefined;
 const busy = ref(false), message = ref(""), error = ref("");
 const assignmentCreated = ref(false);
@@ -76,24 +79,25 @@ function deleteChore(item: { chore: string; name: string }) {
 async function addTask() {
   const selectedDates = dates.value;
   if (dateProblem.value || !selectedDates.length) throw new Error(dateProblem.value || "Choose when to create the assignment.");
-  if (!start.value || !due.value || start.value >= due.value) {
-    throw new Error("The deadline must come after the start time on the selected day.");
+  if (!start.value || !due.value || (startsOn.value === lastDay.value && start.value >= due.value)) {
+    throw new Error("The deadline must come after the start.");
   }
-  const windows = selectedDates.map(day => ({
-    start: localAssignmentTime(day, start.value).toISOString(),
-    end: localAssignmentTime(day, due.value).toISOString(),
+  const windows = selectedDates.map(({ startsOn, endsOn }) => ({
+    start: localAssignmentTime(startsOn, start.value).toISOString(),
+    end: localAssignmentTime(endsOn, due.value).toISOString(),
   }));
   const repeatWeekly = frequency.value === "weekly";
+  const flexibleDays = startsOn.value !== lastDay.value;
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const input = { household, chore: chore.value, windows, repeatWeekly, timeZone };
+  const input = { household, chore: chore.value, windows, repeatWeekly, flexibleDays, timeZone };
   const payload = JSON.stringify(input);
   if (pendingBatch?.payload !== payload) pendingBatch = { payload, batchId: crypto.randomUUID() };
   const result = checked(await api.assignments.tasks["create-batch"]({ ...input, batchId: pendingBatch.batchId }));
   pendingBatch = undefined;
   assignmentCreated.value = true;
-  emit("created", mondayOf(selectedDates[0]));
+  emit("created", mondayOf(selectedDates[0].startsOn));
   return repeatWeekly
-    ? `Weekly assignment created with ${result.tasks.length} ${result.tasks.length === 1 ? "date" : "dates"}.`
+    ? `Weekly assignment created with ${result.tasks.length} ${result.tasks.length === 1 ? "occurrence" : "occurrences"}.`
     : "Assignment created.";
 }
 </script>
@@ -137,10 +141,16 @@ async function addTask() {
         <label>Catalog chore<select v-model="chore" required><option disabled value="">Choose chore</option><option v-for="c in catalog.chores" :key="c.chore" :value="c.chore">{{ c.name }}</option></select></label>
         <fieldset class="assignment-timing" :disabled="busy">
           <div class="assignment-field">
-            <label for="assignment-weekday">Day of the week</label>
-            <select id="assignment-weekday" v-model="weekday">
-              <option v-for="day in mondayFirstWeekdays" :key="day.day" :value="day.day">{{ day.name }}</option>
+            <label for="assignment-timing">When can it be done?</label>
+            <select id="assignment-timing" v-model="timing">
+              <option value="day">Specific day</option>
+              <option value="range">Date range</option>
             </select>
+          </div>
+          <label v-if="timing === 'day'">Task date<input v-model="startsOn" type="date" required></label>
+          <div v-else class="assignment-pair">
+            <label>Start date<input v-model="startsOn" type="date" required></label>
+            <label>End date<input v-model="endsOn" type="date" :min="startsOn" required></label>
           </div>
           <div class="assignment-pair">
             <label>Start time<input v-model="start" type="time" required></label>
@@ -149,23 +159,18 @@ async function addTask() {
           <div class="assignment-field">
             <label for="assignment-frequency">Schedule</label>
             <select id="assignment-frequency" v-model="frequency">
-              <option value="once">One week</option>
+              <option value="once">Once</option>
               <option value="weekly">Repeat weekly</option>
             </select>
           </div>
-          <template v-if="frequency === 'once'">
-            <label>Week containing<input v-model="weekDate" type="date" required></label>
-            <p class="assignment-hint">Pick any date in the week running Monday through Sunday.</p>
-          </template>
-          <div v-else class="assignment-pair">
-            <label>From<input v-model="rangeStart" type="date" required></label>
-            <label>Through<input v-model="rangeEnd" type="date" :min="rangeStart" required></label>
-          </div>
+          <label v-if="frequency === 'weekly'">
+            Repeat through<input v-model="repeatThrough" type="date" :min="lastDay" required>
+          </label>
         </fieldset>
         <p v-if="dateProblem" class="field-error" role="status">{{ dateProblem }}</p>
         <p v-else-if="dates.length" class="assignment-hint" role="status">
-          {{ frequency === 'once' ? `1 assignment on ${formatCalendarDate(dates[0])}`
-            : `1 weekly assignment · ${dates.length} ${dates.length === 1 ? 'date' : 'dates'} from ${formatCalendarDate(dates[0])} through ${formatCalendarDate(dates[dates.length - 1])}` }}
+          {{ frequency === 'once' ? `1 assignment ${formatWindow(dates[0])}`
+            : `1 weekly assignment · first occurrence ${formatWindow(dates[0])} · ${dates.length} ${dates.length === 1 ? 'occurrence' : 'occurrences'} ending ${formatCalendarDate(dates[dates.length - 1].endsOn)}` }}
         </p>
         <button class="button button-primary" :disabled="busy || !catalog.chores.length || !dates.length || !!dateProblem">Create assignment</button>
       </form>

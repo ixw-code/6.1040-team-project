@@ -1,17 +1,23 @@
 import { expect, test } from "bun:test";
-import { assignmentDates, assignmentInWeek, localAssignmentTime, maxAssignmentOccurrences, mondayOf } from "../../src/shared/assignmentDates.ts";
+import { assignmentWindows, localAssignmentTime, maxAssignmentOccurrences, mondayOf } from "../../src/shared/assignmentDates.ts";
 
-test("a date picks the Monday-to-Sunday week, even across a year boundary", () => {
-  expect(mondayOf("2027-01-03")).toBe("2026-12-28");
-  expect(assignmentInWeek(3, "2027-01-03")).toBe("2026-12-30");
-  expect(assignmentInWeek(0, "2027-01-01")).toBe("2027-01-03");
+test("a specific day and a date range each create one assignment occurrence", () => {
+  const day = { startsOn: "2027-01-03", endsOn: "2027-01-03" };
+  const span = { startsOn: "2026-12-31", endsOn: "2027-01-03" };
+  expect(assignmentWindows(day)).toEqual([day]);
+  expect(assignmentWindows(span)).toEqual([span]);
+  expect(mondayOf(day.startsOn)).toBe("2026-12-28");
+  expect(assignmentWindows({ startsOn: span.endsOn, endsOn: span.startsOn })).toEqual([]);
 });
 
-test("a weekly range includes both endpoints and keeps the local hour across clock changes", () => {
-  const dates = assignmentDates(0, "2027-03-07", "2027-03-28");
-  expect(dates).toEqual(["2027-03-07", "2027-03-14", "2027-03-21", "2027-03-28"]);
-  for (const day of dates) expect(localAssignmentTime(day, "09:30").getHours()).toBe(9);
-  expect(assignmentDates(1, "2027-03-02", "2027-03-07")).toEqual([]);
-  expect(assignmentDates(1, "2027-04-01", "2027-03-01")).toEqual([]);
-  expect(assignmentDates(1, "2027-01-01", "2100-01-01")).toHaveLength(maxAssignmentOccurrences + 1);
+test("weekly scheduling repeats complete date windows across clock changes", () => {
+  const first = { startsOn: "2027-03-12", endsOn: "2027-03-14" };
+  const second = { startsOn: "2027-03-19", endsOn: "2027-03-21" };
+  expect(assignmentWindows(first, "2027-03-13")).toEqual([]);
+  expect(assignmentWindows(first, "2027-03-20")).toEqual([first]);
+  expect(assignmentWindows(first, second.endsOn)).toEqual([first, second]);
+  for (const { endsOn } of assignmentWindows(first, second.endsOn)) {
+    expect(localAssignmentTime(endsOn, "09:30").getHours()).toBe(9);
+  }
+  expect(assignmentWindows(first, "2100-01-01")).toHaveLength(maxAssignmentOccurrences + 1);
 });

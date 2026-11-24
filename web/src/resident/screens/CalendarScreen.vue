@@ -3,7 +3,7 @@ import { computed, watch, ref } from "vue";
 import ScopeToggle from "../components/ScopeToggle.vue";
 import StickyNote from "../components/StickyNote.vue";
 import WeekGrid from "../components/WeekGrid.vue";
-import { noteColor, statusText, tilt, timeRange } from "../display.ts";
+import { formatDate, noteColor, statusText, tilt, timeRange } from "../display.ts";
 import { useNav } from "../nav.ts";
 import { useResidentApi } from "../residentApi.ts";
 import { localDate } from "../../household.ts";
@@ -35,7 +35,11 @@ const byId = computed(() => new Map(people.value.map((p) => [p.id, p])));
 const others = computed(() => people.value.filter((p) => !p.isMe));
 const shown = computed(() => tasks.value
   .filter((t) => !onlyMe.value || byId.value.get(t.ownerId)?.isMe)
-  .map((t) => ({ ...t, end: t.end ?? t.due })));
+  .map((task) => {
+    const end = task.end ?? task.due;
+    const time = task.flexibleDays ? `${formatDate(task.start)} – ${formatDate(end)}` : timeRange(task.start, end);
+    return { ...task, end, time };
+  }));
 </script>
 
 <template>
@@ -58,12 +62,12 @@ const shown = computed(() => tasks.value
           :pin="false"
           :color="noteColor(item.status, byId.get(item.ownerId))"
           :tilt="tilt(item.id)"
-          :label="`${item.title}, ${byId.get(item.ownerId)?.isMe ? 'you' : byId.get(item.ownerId)?.name ?? 'Unassigned'}, ${timeRange(item.start, item.end)}, ${statusText(item.status, byId.get(item.ownerId))}`"
+          :label="`${item.title}, ${byId.get(item.ownerId)?.isMe ? 'you' : byId.get(item.ownerId)?.name ?? 'Unassigned'}, ${item.time}, ${statusText(item.status, byId.get(item.ownerId))}`"
           class="cal-note"
           @open="nav.go({ name: 'task', taskId: item.id })"
         >
           <span>{{ item.title }}</span>
-          <span>{{ timeRange(item.start, item.end) }}</span>
+          <span>{{ item.time }}</span>
           <span>{{ byId.get(item.ownerId)?.isMe ? "Me" : byId.get(item.ownerId)?.name ?? 'Unassigned' }}</span>
           <span>{{ statusText(item.status, byId.get(item.ownerId)) }}</span>
         </StickyNote>

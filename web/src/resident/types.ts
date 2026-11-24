@@ -32,6 +32,7 @@ export interface Task {
   /** Start of the window the task can be done in (ISO). */
   start: string;
   end?: string;
+  flexibleDays?: boolean;
   /** Deadline (ISO). */
   due: string;
   status: TaskStatus;

@@ -136,7 +136,7 @@ Defined in [PhotoChecking](../design/concepts/PhotoChecking.md), line 1.
 
 #### Actions
 
-- `submit(person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, method: ReviewMethod) : returns (submission: Submission)`
+- `submit(person: Person, subject: Subject, photo: Photo, criteria: String, baseline: Photo, method: ReviewMethod, submittedAt?: DateTime) : returns (submission: Submission)`
   - Refuses `ALREADY_PENDING`: This subject already has a pending submission.
   - Refuses `ALREADY_APPROVED`: This subject already has an approved submission.
 - `approve(submission: Submission, reviewer: Reviewer, method: ReviewMethod, feedback: String) : returns (submission: Submission, subject: Subject, person: Person)`
@@ -232,7 +232,7 @@ Defined in [TaskScheduling](../design/concepts/TaskScheduling.md), line 1.
 - `add(group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval) : returns (task: Task)`
   - Refuses `TASK_WEIGHT_INVALID`: Task weight must be between 1 and 10.
   - Refuses `TASK_INTERVAL_INVALID`: Provide a deadline or a valid interval that ends by the deadline when both are given.
-- `addBatch(group: Group, item: Item, category?: Category, weight: Number, intervals: IntervalSet, batchId: String, repeatWeekly?: Flag, timeZone?: String) : returns (tasks: TaskSet)`
+- `addBatch(group: Group, item: Item, category?: Category, weight: Number, intervals: IntervalSet, batchId: String, repeatWeekly?: Flag, flexibleDays?: Flag, timeZone?: String) : returns (tasks: TaskSet)`
   - Refuses `TASK_WEIGHT_INVALID`: Task weight must be between 1 and 10.
   - Refuses `TASK_INTERVAL_INVALID`: Provide between 1 and 104 valid task intervals.
 - `archiveAssignment(group: Group, task: Task) : returns (task: Task)`
@@ -278,8 +278,8 @@ Defined in [TaskScheduling](../design/concepts/TaskScheduling.md), line 1.
 
 #### Queries
 
-- `_assignments(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, weekly: Flag, occurrences: Number, remaining: Number, mixed: Flag, assignee: Person, startsAt: DateTime, endsAt: DateTime)`
-- `_get(task: Task) : optional (group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime, archived?: Flag, timeZone?: String)`
+- `_assignments(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, weekly: Flag, occurrences: Number, remaining: Number, mixed: Flag, assignee: Person, startsAt: DateTime, firstWindowEndsAt: DateTime, endsAt: DateTime, flexibleDays: Flag, timeZone: String)`
+- `_get(task: Task) : optional (group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime, archived?: Flag, timeZone?: String, flexibleDays?: Flag)`
 - `_activeTask(task: Task) : optional (group: Group)`
 - `_tasks(group: Group) : many (task: Task, item: Item, category?: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)`
 - `_schedule(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, category?: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)`
@@ -488,13 +488,14 @@ Authored path: `ChoreAssignments.ScheduleTaskDetails`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
 
 ```former
-Former "the display details of (task) in (household) at (asOf)" — inputs (task, household, asOf); bindings (item, category, name, deadline, interval, assignee, source, completedAt, completedBy, weight, status); promises exactly one record — forms:
+Former "the display details of (task) in (household) at (asOf)" — inputs (task, household, asOf); bindings (item, category, name, deadline, interval, flexibleDays, assignee, source, completedAt, completedBy, weight, status); promises exactly one record — forms:
   a record of
     where TaskScheduling._get (task) has (group: household, item, weight)
     where whether TaskScheduling._get (task) has (category)
     where (category) is assignmentCategory (category)
     where whether TaskScheduling._get (task) has (deadline)
     where whether TaskScheduling._get (task) has (interval)
+    where whether TaskScheduling._get (task) has (flexibleDays)
     where whether TaskScheduling._get (task) has (assignee, source)
     where whether TaskScheduling._get (task) has (completedAt, completedBy)
     where status is assignmentStatus (asOf, completedAt, deadline, interval)
@@ -505,6 +506,7 @@ Former "the display details of (task) in (household) at (asOf)" — inputs (task
     completedAt
     completedBy
     deadline
+    flexibleDays
     interval
     item
     source
@@ -532,18 +534,21 @@ Authored path: `ChoreAssignments.AssignmentList`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 94.
 
 ```former
-Former "the assignments of (household) from (from) until (until)" — inputs (household, from, until); bindings (task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, endsAt); promises exactly one record — forms:
-  each TaskScheduling._assignments (from, group: household, until) has (assignee, endsAt, item, mixed, occurrences, remaining, startsAt, task, weekly)
+Former "the assignments of (household) from (from) until (until)" — inputs (household, from, until); bindings (task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, firstWindowEndsAt, endsAt, flexibleDays, timeZone); promises exactly one record — forms:
+  each TaskScheduling._assignments (from, group: household, until) has (assignee, endsAt, firstWindowEndsAt, flexibleDays, item, mixed, occurrences, remaining, startsAt, task, timeZone, weekly)
     form a record of
       assignee
       chore: whether former "the details of the catalogue (item) in (household)" with (household, item)
       endsAt
+      firstWindowEndsAt
+      flexibleDays
       item
       mixed
       occurrences
       remaining
       startsAt
       task
+      timeZone
       weekly
 ```
 
@@ -956,7 +961,7 @@ Authored path: `ChoreAssignments.CreateTaskBatch`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 51.
 
 ```reaction
-when RequestBoundary.request (batchId, chore, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
+when RequestBoundary.request (batchId, chore, flexibleDays, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
 then
   Sessioning.use (session)
 ```
@@ -970,12 +975,12 @@ Authored path: `ChoreAssignments.CreateTaskBatch`.
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTaskBatch
 where
-  earlier, RequestBoundary.request (batchId, chore, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
+  earlier, RequestBoundary.request (batchId, chore, flexibleDays, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
   view "(requester) oversees (household)" with (household, requester)
   view "(chore) belongs to (household) with an optional valid category" with (chore, household) has (category, difficulty: weight)
   intervals is availabilityWindows (windows)
 then
-  TaskScheduling.addBatch (batchId, category, group: household, intervals, item: chore, repeatWeekly, timeZone, weight)
+  TaskScheduling.addBatch (batchId, category, flexibleDays, group: household, intervals, item: chore, repeatWeekly, timeZone, weight)
 ```
 
 ### ChoreAssignments.CreateTaskBatch:created#3
@@ -985,9 +990,9 @@ Authored path: `ChoreAssignments.CreateTaskBatch`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 51.
 
 ```reaction
-when TaskScheduling.addBatch (batchId, category, group: household, intervals, item: chore, repeatWeekly, timeZone, weight, tasks), asked by ChoreAssignments.CreateTaskBatch:created#2
+when TaskScheduling.addBatch (batchId, category, flexibleDays, group: household, intervals, item: chore, repeatWeekly, timeZone, weight, tasks), asked by ChoreAssignments.CreateTaskBatch:created#2
 where
-  earlier, RequestBoundary.request (batchId, chore, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
+  earlier, RequestBoundary.request (batchId, chore, flexibleDays, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
 then
   RequestBoundary.respond (requestId, tasks)
 ```
@@ -1001,7 +1006,7 @@ Authored path: `ChoreAssignments.CreateTaskBatch`.
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTaskBatch
 where
-  earlier, RequestBoundary.request (batchId, chore, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
+  earlier, RequestBoundary.request (batchId, chore, flexibleDays, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
   HouseholdManaging._household (household)
   no view "(requester) oversees (household)" with (household, requester)
 then
@@ -1017,7 +1022,7 @@ Authored path: `ChoreAssignments.CreateTaskBatch`.
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTaskBatch
 where
-  earlier, RequestBoundary.request (batchId, chore, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
+  earlier, RequestBoundary.request (batchId, chore, flexibleDays, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
   view "(requester) oversees (household)" with (household, requester)
   no view "(chore) belongs to (household) with an optional valid category" with (chore, household)
 then
@@ -1033,7 +1038,7 @@ Authored path: `ChoreAssignments.CreateTaskBatch`.
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTaskBatch
 where
-  earlier, RequestBoundary.request (batchId, chore, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
+  earlier, RequestBoundary.request (batchId, chore, flexibleDays, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
   no HouseholdManaging._household (household)
 then
   RequestBoundary.respond (error: "NOT_FOUND", requestId)
@@ -4046,7 +4051,7 @@ not listed here have no explicit input contract.
 - `/assignments/set` — requires `session`, `household`, `entries`
 - `/assignments/task` — requires `session`, `household`, `task`
 - `/assignments/tasks/create` — requires `session`, `household`, `chore`; fills `deadline` with null when absent; fills `interval` with null when absent
-- `/assignments/tasks/create-batch` — requires `session`, `household`, `chore`, `batchId`, `windows`; fills `repeatWeekly` with false when absent; fills `timeZone` with null when absent
+- `/assignments/tasks/create-batch` — requires `session`, `household`, `chore`, `batchId`, `windows`; fills `flexibleDays` with false when absent; fills `repeatWeekly` with false when absent; fills `timeZone` with null when absent
 - `/assignments/tasks/deadline` — requires `session`, `household`, `task`; fills `deadline` with null when absent
 - `/assignments/tasks/delete` — requires `session`, `household`, `task`
 - `/assignments/tasks/interval` — requires `session`, `household`, `task`; fills `interval` with null when absent

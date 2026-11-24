@@ -48,8 +48,9 @@ export class PhotoCheckingConcept {
     );
   }
 
-  async submit({ person, subject, photo, criteria, baseline, method }: Evidence & {
+  async submit({ person, subject, photo, criteria, baseline, method, submittedAt = new Date() }: Evidence & {
     method: ReviewMethod;
+    submittedAt?: Date;
   }): Promise<SubmissionRef> {
     const submissions = this.#submissions();
     // Create the unique index on first use so concurrent writers cannot claim the same attempt number.
@@ -82,7 +83,7 @@ export class PhotoCheckingConcept {
           selectedMethod: method,
           reviewMethod: method,
           status: "PENDING",
-          submittedAt: new Date(),
+          submittedAt,
           feedback: "",
         });
         return { submission };
