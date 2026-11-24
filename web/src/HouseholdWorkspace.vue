@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, provide, ref, onErrorCaptured } from "vue";
-import { api } from "./api.ts";
-import { checked, householdKey, post, type Catalog, type Category, type Home } from "./household.ts";
+import { householdKey, localDate, post, type Catalog, type Home } from "./household.ts";
 import HouseholdSettings from "./HouseholdSettings.vue";
+import { mondayOf } from "../../src/shared/assignmentDates.ts";
+import ChoreCatalog from "./ChoreCatalog.vue";
 import ManageHousehold from "./ManageHousehold.vue";
 import ReviewQueue from "./ReviewQueue.vue";
 import ResidentApp from "./resident/ResidentApp.vue";
@@ -12,16 +13,13 @@ const emit = defineEmits<{ changed: [] }>();
 const props = defineProps<{ home: Home; person: string }>();
 const overseer = props.person === props.home.overseer;
 const tab = ref(overseer ? "Manage" : "My board");
-const catalog = ref<Catalog>({ people: [], ranking: [], chores: [] });
-const categories = ref<Category[]>([]);
+const assignmentWeek = ref(mondayOf(localDate(new Date())));
+const catalog = ref<Catalog>({ people: [], ranking: [], chores: [], choreOrder: [] });
 const ready = ref(false);
 const error = ref("");
 const version = ref(0);
 async function refresh() {
-  const input = { household: props.home.household };
-  const [data, groups] = await Promise.all([post<Catalog>("catalog/list", input), api.households.categories(input)]);
-  categories.value = checked(groups).categories;
-  catalog.value = data;
+  catalog.value = await post<Catalog>("catalog/list", { household: props.home.household });
 }
 async function reload() {
   error.value = "";
@@ -29,7 +27,7 @@ async function reload() {
   catch (e) { error.value = (e as Error).message; }
 }
 onErrorCaptured(e => { error.value = e.message; return false; });
-provide(householdKey, { home: props.home, person: props.person, categories, catalog, refresh });
+provide(householdKey, { home: props.home, person: props.person, catalog, refresh });
 useNav().switchTab("tasks");
 onMounted(reload);
 </script>
@@ -40,11 +38,13 @@ onMounted(reload);
   </div>
   <p v-if="error" class="field-error" role="alert">{{ error }}</p>
   <nav class="role-switch board-nav" aria-label="Household sections">
-    <button v-for="item in overseer ? ['Manage', 'Review queue', 'My board', 'Settings'] : ['My board', 'Settings']" :key="item" :aria-pressed="tab === item" @click="tab = item">{{ item }}</button>
+    <button v-for="item in overseer ? ['Manage', 'Chore catalog', 'Review queue', 'My board', 'Settings'] : ['My board', 'Settings']" :key="item" :aria-pressed="tab === item" @click="tab = item">{{ item }}</button>
   </nav>
   <p v-if="!ready && !error">Loading household…</p>
   <template v-if="ready" :key="version">
-    <ManageHousehold v-if="overseer && tab === 'Manage'" />
+    <ManageHousehold v-if="overseer && tab === 'Manage'" v-model:week="assignmentWeek" />
+    <ChoreCatalog v-else-if="overseer && tab === 'Chore catalog'"
+      @created="assignmentWeek = $event" @view-assignments="tab = 'Manage'" />
     <ReviewQueue v-else-if="overseer && tab === 'Review queue'" />
     <HouseholdSettings v-else-if="tab === 'Settings'" @changed="emit('changed')" />
     <ResidentApp v-else />

@@ -1,109 +1,136 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { api } from "./api.ts";
-import { checked, localDate, post, upload, useHousehold, weekWindow, type ScheduleRow } from "./household.ts";
+import { checked, post, useHousehold, weekWindow, type AssignmentRow } from "./household.ts";
 
-const { home, catalog, categories, refresh } = useHousehold();
+const week = defineModel<string>("week", { required: true });
+const { home, catalog, refresh } = useHousehold();
 const household = home.household;
-const username = ref(""), categoryName = ref(""), category = ref(""), title = ref(""), criteria = ref(""), instructions = ref("");
-const difficulty = ref(1), file = ref<File>(), chore = ref(""), start = ref(""), due = ref("");
-const week = ref(localDate(new Date()));
-const schedule = ref<ScheduleRow[]>([]);
-const busy = ref(false), message = ref(""), error = ref("");
-const nameOf = (id: string) => catalog.value.people.find(p => p.person === id)?.username ?? id;
+const username = ref("");
+const assignments = ref<AssignmentRow[]>([]);
+const waiting = computed(() => assignments.value.filter(row => row.remaining > 0 && !row.assignee).length);
+const busy = ref(false);
+const message = ref("");
+const error = ref("");
 
-async function loadSchedule() {
-  schedule.value = checked(await api.assignments.schedule({ household, ...weekWindow(week.value) })).tasks;
+const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long" });
+const calendarDate = (date: string) => dateFormat.format(new Date(date));
+const dueDate = (row: AssignmentRow) => new Date(row.endsAt).toLocaleString();
+const nameOf = (id: string | null) => catalog.value.people.find(p => p.person === id)?.username ?? "Former resident";
+
+async function loadAssignments() {
+  assignments.value = checked(await api.assignments.list({ household, ...weekWindow(week.value) })).assignments;
 }
+
 async function run(action: () => Promise<string>) {
   if (busy.value) return;
-  busy.value = true; message.value = ""; error.value = "";
-  try { message.value = await action(); }
-  catch (e) { error.value = (e as Error).message; }
-  finally { busy.value = false; }
+  busy.value = true;
+  message.value = "";
+  error.value = "";
+  try {
+    message.value = await action();
+  } catch (e) {
+    error.value = (e as Error).message;
+  } finally {
+    busy.value = false;
+  }
 }
+
 async function addResident() {
   await post("catalog/add-resident", { household, username: username.value.trim() });
-  username.value = ""; await refresh(); return "Resident added.";
+  username.value = "";
+  await refresh();
+  return "Resident added.";
 }
-async function addCategory() {
-  const result = checked(await api.households.categories.add({ household, name: categoryName.value.trim() }));
-  categoryName.value = ""; await refresh(); category.value = result.category; return "Category added.";
-}
-async function addChore() {
-  if (!file.value) throw new Error("Choose a baseline photo.");
-  const photo = await upload(file.value);
-  const result = await post<{ chore: string }>("catalog/create", {
-    household, category: category.value, name: title.value, criteria: criteria.value, description: instructions.value,
-    difficulty: difficulty.value, photo,
-  });
-  await refresh(); chore.value = result.chore; title.value = ""; criteria.value = ""; instructions.value = "";
-  return "Chore saved. Choose its time below to create an assignment.";
-}
-async function addTask() {
-  const from = new Date(start.value), end = new Date(due.value);
-  if (from >= end) throw new Error("The deadline must come after the start.");
-  checked(await api.assignments.tasks.create({ household, chore: chore.value, deadline: end.toISOString(),
-    interval: { start: from.toISOString(), end: end.toISOString() } }));
-  week.value = localDate(from); await loadSchedule(); return "Assignment created.";
-}
+
 async function autoSchedule() {
-  const result = checked(await api.assignments.weekly({ household, ...weekWindow(week.value) }));
-  await loadSchedule();
-  return `${result.scheduled.length} assigned. ${result.unassigned.length} still need availability covering the full time slot.`;
+  const { scheduled, unassigned } = checked(await api.assignments.weekly({ household, ...weekWindow(week.value) }));
+  await loadAssignments();
+  return `${scheduled.length} assigned. ${unassigned.length} still need a resident available for all their dates.`;
 }
-async function assign(row: ScheduleRow, select: HTMLSelectElement) {
-  const id = select.value;
-  select.value = row.assignee ?? "";
+
+async function assign(row: AssignmentRow, select: HTMLSelectElement) {
+  const assignee = select.value;
+  select.value = row.mixed ? "mixed" : row.assignee ?? "";
   await run(async () => {
-    checked(await api.assignments.set({ household, entries: [{ task: row.task, ...(id && { assignee: id }) }] }));
-    await loadSchedule(); return "Assignment updated.";
+    checked(await api.assignments.set({ household, entries: [{ task: row.task, ...(assignee && { assignee }) }] }));
+    await loadAssignments();
+    return row.weekly ? "Weekly assignment updated." : "Assignment updated.";
   });
 }
-onMounted(loadSchedule);
+
+function deleteAssignment(row: AssignmentRow) {
+  const chore = row.chore?.name ?? "this chore";
+  const question = row.weekly
+    ? `Delete all dates in the weekly assignment for “${chore}”?`
+    : `Delete the task for “${chore}” due ${dueDate(row)}?`;
+  if (!window.confirm(question)) return;
+  void run(async () => {
+    checked(await api.assignments.tasks.delete({ household, task: row.task }));
+    await loadAssignments();
+    return row.weekly ? "Weekly assignment deleted." : "Task deleted.";
+  });
+}
+
+function loadWeek() {
+  if (week.value) void run(async () => { await loadAssignments(); return ""; });
+}
+onMounted(loadWeek);
 </script>
+
 <template>
   <div class="management">
     <p v-if="message" class="notice notice-visible" role="status">{{ message }}</p>
     <p v-if="error" class="field-error" role="alert">{{ error }}</p>
-    <div class="alpha-grid">
-      <section class="panel alpha-card"><h2>Household members</h2>
-        <ul><li v-for="p in catalog.people" :key="p.person">{{ p.username }} · {{ catalog.ranking.find(r => r.person === p.person)?.score ?? 0 }} {{ catalog.ranking.find(r => r.person === p.person)?.score === 1 ? 'point' : 'points' }}</li></ul>
-        <form @submit.prevent="run(addResident)"><label>Registered username<input v-model="username" required></label>
-          <button class="button button-secondary" :disabled="busy">Add resident</button></form>
-      </section>
-      <section class="panel alpha-card"><h2>Work categories</h2>
-        <p>{{ categories.map(c => c.name).join(', ') || 'Add a category so residents can set their preferences.' }}</p>
-        <form @submit.prevent="run(addCategory)"><label>Category name<input v-model="categoryName" required maxlength="100"></label>
-          <button class="button button-secondary" :disabled="busy">Add category</button></form>
-      </section>
-      <form class="panel alpha-card" @submit.prevent="run(addChore)"><h2>Chore catalog</h2>
-        <label>Chore name<input v-model="title" required maxlength="150"></label>
-        <label>Category<select v-model="category" required><option disabled value="">Choose category</option><option v-for="c in categories" :key="c.category" :value="c.category">{{ c.name }}</option></select></label>
-        <label>Effort (1–10)<input v-model.number="difficulty" type="number" required min="1" max="10"></label>
-        <label>Photo instructions<textarea v-model="instructions" required maxlength="4000"></textarea></label>
-        <label>Completion criteria<textarea v-model="criteria" required maxlength="4000"></textarea></label>
-        <label>Baseline photo (JPG, PNG or WebP, up to 10 MB)<input type="file" accept="image/jpeg,image/png,image/webp" required @change="file = ($event.target as HTMLInputElement).files?.[0]"></label>
-        <button class="button button-primary" :disabled="busy || !categories.length">Save chore</button>
+
+    <section class="panel alpha-card">
+      <h2>Household members</h2>
+      <ul>
+        <li v-for="p in catalog.people" :key="p.person">
+          {{ p.username }} · {{ catalog.ranking.find(r => r.person === p.person)?.score ?? 0 }}
+          {{ catalog.ranking.find(r => r.person === p.person)?.score === 1 ? 'point' : 'points' }}
+        </li>
+      </ul>
+      <form @submit.prevent="run(addResident)">
+        <label>Registered username<input v-model="username" required></label>
+        <button class="button button-secondary" :disabled="busy">Add resident</button>
       </form>
-      <form class="panel alpha-card" @submit.prevent="run(addTask)"><h2>Create assignment</h2>
-        <label>Catalog chore<select v-model="chore" required><option disabled value="">Choose chore</option><option v-for="c in catalog.chores" :key="c.chore" :value="c.chore">{{ c.name }}</option></select></label>
-        <label>Starts<input v-model="start" type="datetime-local" required></label>
-        <label>Deadline<input v-model="due" type="datetime-local" required></label>
-        <button class="button button-primary" :disabled="busy || !catalog.chores.length">Create assignment</button>
-      </form>
-    </div>
-    <section class="panel alpha-card"><h2>Assignment schedule</h2>
-      <label>Week starting<input v-model="week" type="date" required :disabled="busy" @change="week && run(async () => { await loadSchedule(); return ''; })"></label>
+    </section>
+
+    <section class="panel alpha-card">
+      <h2>Assignment schedule</h2>
+      <label>Week starting<input v-model="week" type="date" required :disabled="busy" @change="loadWeek"></label>
       <button class="button button-primary" :disabled="busy || !week" @click="run(autoSchedule)">Assign available residents</button>
-      <p v-if="!schedule.length">No assignments in this week.</p>
-      <div v-for="t in schedule" :key="t.task" class="schedule-row">
-        <div><strong>{{ t.chore?.name ?? 'Chore' }}</strong><p>Due {{ new Date(t.deadline ?? t.interval!.end).toLocaleString() }} · {{ t.status.toLowerCase().replace('_',' ') }}</p></div>
-        <span v-if="t.completedAt">{{ nameOf(t.completedBy!) }}</span>
-        <select v-else :value="t.assignee ?? ''" :disabled="busy" :aria-label="'Assignee for ' + t.chore?.name" @change="assign(t, $event.target as HTMLSelectElement)">
-          <option value="">Unassigned</option><option v-for="p in catalog.people" :key="p.person" :value="p.person">{{ p.username }}</option>
-        </select>
-      </div>
+      <p v-if="!assignments.length && !busy">No assignments in this week.</p>
+      <template v-else-if="assignments.length">
+        <p>{{ assignments.length }} {{ assignments.length === 1 ? 'assignment' : 'assignments' }} · {{ waiting }} to assign</p>
+        <ul>
+          <li v-for="row in assignments" :key="row.task" class="schedule-row">
+            <div>
+              <strong>{{ row.chore?.name ?? 'Chore' }}</strong>
+              <template v-if="row.weekly">
+                <p>Weekly on {{ weekdayFormat.format(new Date(row.startsAt)) }} · {{ calendarDate(row.startsAt) }} through {{ calendarDate(row.endsAt) }}</p>
+                <p>{{ row.occurrences - row.remaining }} of {{ row.occurrences }} dates completed</p>
+              </template>
+              <p v-else>Due {{ dueDate(row) }} · {{ !row.remaining ? 'completed' : new Date(row.endsAt) < new Date() ? 'overdue' : 'pending' }}</p>
+            </div>
+            <div class="actions-inline">
+              <span v-if="!row.remaining">{{ nameOf(row.assignee) }}</span>
+              <select v-else :value="row.mixed ? 'mixed' : row.assignee ?? ''" :disabled="busy"
+                :aria-label="`Assignee for ${row.chore?.name ?? 'chore'} ${row.weekly ? 'weekly through' : 'due'} ${dueDate(row)}`"
+                @change="assign(row, $event.target as HTMLSelectElement)">
+                <option v-if="row.mixed" value="mixed" disabled>Mixed assignees</option>
+                <option value="">Unassigned</option>
+                <option v-for="p in catalog.people" :key="p.person" :value="p.person">{{ p.username }}</option>
+              </select>
+              <button type="button" class="button button-delete" :disabled="busy"
+                :aria-label="`Delete ${row.weekly ? 'weekly assignment' : 'task'} for ${row.chore?.name ?? 'chore'} through ${dueDate(row)}`"
+                @click="deleteAssignment(row)">{{ row.weekly ? 'Delete series' : 'Delete task' }}</button>
+            </div>
+          </li>
+        </ul>
+      </template>
     </section>
   </div>
 </template>

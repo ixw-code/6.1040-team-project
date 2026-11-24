@@ -1,7 +1,7 @@
 # HouseholdManaging
 
 ## Purpose
-Let people establish and maintain shared households, and manage its residents, overseer, and keep track of household work categories and resident preferences.
+Let people establish shared households and manage residents, oversight, and chore rankings.
 
 *Prevents*: uncertainty about who belongs to a household, who oversees a household, and the categories available for organizing housework. 
 
@@ -29,6 +29,12 @@ opaque ResidentRows
 opaque SchedulingPreferences
   A set of rows, each with person: Person, category: Category, and preferenceLevel: PreferenceLevel.
 
+opaque ChoreOrder
+  A list of chore IDs ordered from most to least preferred.
+
+opaque ChorePreferences
+  A set of rows with a person and their chore order.
+
 opaque CategorySet
   A set of categories.
 ```
@@ -44,6 +50,7 @@ a set of Households with
 a set of Residencies with
   a household Household
   a person Person
+  an optional choreOrder ChoreOrder
   unique household and person
 
 a set of Categories with 
@@ -192,6 +199,21 @@ setPreference(household: Household, person: Person, category: Category, preferen
     update the residency's preference level for category
     returns preference
 
+setChoreOrder(household: Household, person: Person, order: ChoreOrder): returns (order: ChoreOrder)
+  where order repeats a chore
+  then
+    refuses CHORE_ORDER_INVALID "Rank each chore at most once."
+  where the order is valid and household does not exist
+  then
+    refuses HOUSEHOLD_NOT_FOUND "This household does not exist."
+  where the order is valid and person is not a resident of an existing household
+  then
+    refuses HOUSEHOLD_RESIDENT_NOT_FOUND "This person is not a resident."
+  where the order is valid and person is a resident
+  then
+    replace the residency's chore order
+    returns order
+
 remove(household: Household) : returns (household: Household)
   where household does not exist
   then
@@ -219,8 +241,11 @@ _categories(household: Household) : many (category: Category, name: String)
 _residents(household: Household) : many (person: Person)
   Returns the residents belonging to the household in the order they joined, or no rows if the household is unknown.
 
-_schedulingInputs(household: Household) : one (people: ResidentRows, preferences: SchedulingPreferences)
-  Returns the residents and their category preferences from the same household state, or two empty sets if the household does not exist.
+_choreOrder(household: Household, person: Person) : one (order: ChoreOrder)
+  Returns this resident's saved order, or an empty list when they have none.
+
+_schedulingInputs(household: Household) : one (people: ResidentRows, preferences: SchedulingPreferences, chorePreferences: ChorePreferences)
+  Returns residents, saved chore rankings, and legacy category preferences from one household snapshot, or empty sets if the household does not exist.
 
 _allResidents(household: Household, people: PersonSet) : one (all: Flag)
   Returns whether each supplied person is a resident of the household. Returns true for an empty set and false for a nonempty set when the household is unknown.

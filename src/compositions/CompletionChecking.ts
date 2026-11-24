@@ -15,6 +15,7 @@ export type CompletionTask = {
   baseline: string;
   dueAt: Date;
   active: boolean;
+  archived?: boolean;
   completed: boolean;
 };
 
@@ -138,7 +139,7 @@ export function createCompletionHandler(
     const items = [];
     for (const { submission, subject } of await PhotoChecking._pending({ method: "MANUAL" })) {
       const task = await taskById(subject);
-      if (!task || task.household !== household) continue;
+      if (!task || task.archived || task.household !== household) continue;
       const [details] = await PhotoChecking._submission({ submission });
       if (!details || details.status !== "PENDING" || details.reviewMethod !== "MANUAL") continue;
       const { person, photo, criteria, baseline, submittedAt } = details;
@@ -218,6 +219,7 @@ export function createCompletionHandler(
           if (!details) return failure(404);
           const task = await hooks.task(details.subject);
           if (!task || await hooks.role(task.household, person) !== "OVERSEER") return failure(404);
+          if (task.archived && details.status !== "APPROVED") return failure(404);
 
           if (decision === "REJECT") {
             const result = await PhotoChecking.reject({ submission, reviewer: person, reason: feedback });

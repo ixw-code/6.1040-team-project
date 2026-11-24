@@ -1,9 +1,10 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
 import { compute, each, former, is, no, now, reaction, view, when, where, whether } from "@mit-sdg/sync-engine/language";
 import { concepts, computations } from "../concepts.ts";
+import { maxAssignmentOccurrences } from "../shared/assignmentDates.ts";
 
 const { HouseholdManaging, ChoreCataloguing, TaskScheduling, Sessioning } = concepts;
-const { assignmentDate, assignmentInterval, assignmentPeople, assignmentStatus, matchesPersonalTask, assignmentIsIncomplete, availabilityWindows } = computations;
+const { assignmentDate, assignmentInterval, assignmentPeople, assignmentStatus, matchesPersonalTask, assignmentIsIncomplete, availabilityWindows, assignmentCategory, activeChorePreferences } = computations;
 
 const CanManageSchedule = view("(requester) oversees (household)", ({ requester, household }) =>
   where(HouseholdManaging._household({ household }).is({ overseer: requester })),
@@ -27,17 +28,24 @@ const CanReadHouseholdDetails = view(
 ).holds();
 
 const ValidHouseholdChore = view(
-  "(chore) has a valid category in (household)",
-  ({ chore, household }, { category, difficulty }) => where(
-    ChoreCataloguing._get({ chore }).is({ group: household, category, difficulty }),
-    HouseholdManaging._categories({ household }).is({ category }),
-  ),
+  "(chore) belongs to (household) with an optional valid category",
+  ({ chore, household }, { category, difficulty }) => [
+    where(
+      ChoreCataloguing._active({ chore }).is({ group: household, category, difficulty }),
+      HouseholdManaging._categories({ household }).is({ category }),
+    ),
+    where(
+      ChoreCataloguing._active({ chore }).is({ group: household, difficulty }),
+      whether(ChoreCataloguing._active({ chore }).is({ category })),
+      compute(assignmentCategory, { category }, { present: false, category }),
+    ),
+  ],
 ).optional();
 
 const AssignmentIsModifiable = view(
   "(task) is an incomplete task in (household)",
   ({ task, household }, _outputs, { completedAt }) => where(
-    TaskScheduling._get({ task }).is({ group: household }),
+    TaskScheduling._activeTask({ task }).is({ group: household }),
     whether(TaskScheduling._get({ task }).is({ completedAt })),
     compute(assignmentIsIncomplete, { completedAt }, { incomplete: true }),
   ),
@@ -80,7 +88,9 @@ const ScheduleTaskDetails = former(
   "the display details of (task) in (household) at (asOf)",
   ({ task, household, asOf }, { item, category, name, deadline, interval, assignee, source, completedAt, completedBy, weight, status }) =>
     where(
-      TaskScheduling._get({ task }).is({ group: household, item, category, weight }),
+      TaskScheduling._get({ task }).is({ group: household, item, weight }),
+      whether(TaskScheduling._get({ task }).is({ category })),
+      compute(assignmentCategory, { category }, { category }),
       whether(TaskScheduling._get({ task }).is({ deadline })),
       whether(TaskScheduling._get({ task }).is({ interval })),
       whether(TaskScheduling._get({ task }).is({ assignee, source })),
@@ -224,12 +234,30 @@ const CreateTask = route("tasks/create", { chore: text, deadline: nullable(date)
   );
 }, { deadline: null, interval: null });
 
+const CreateTaskBatch = route("tasks/create-batch", {
+  chore: text,
+  batchId: value => typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(value),
+  windows: value => Array.isArray(value) && value.length > 0 && value.length <= maxAssignmentOccurrences && value.every(interval),
+  repeatWeekly: value => typeof value === "boolean",
+}, ({ session, requester, household, chore, batchId, windows, repeatWeekly, intervals, category, weight, tasks }) => {
+  const allowed = CanManageSchedule({ requester, household });
+  const valid = ValidHouseholdChore({ chore, household });
+  return receive({ session, household, chore, batchId, windows, repeatWeekly })
+    .then(Sessioning.use({ session }).responds({ subject: requester })).then(
+      missingHousehold(household), denied(household, allowed),
+      where(allowed, no(valid.is({}))).then(respond({ error: "NOT_FOUND" })).named("missingChore"),
+      where(allowed, valid.is({ category, difficulty: weight }), compute(availabilityWindows, { windows }, intervals))
+        .then(TaskScheduling.addBatch({ group: household, item: chore, category, weight, intervals, batchId, repeatWeekly }).responds({ tasks }))
+        .then(respond({ tasks })).named("created"),
+    );
+}, { repeatWeekly: false });
+
 function taskChange(path: string, field: "deadline" | "interval" | undefined) {
   return route(path, { task: text, ...(field === "deadline" ? { deadline: nullable(date) }
     : field === "interval" ? { interval: nullable(interval) } : {}) },
     ({ session, requester, household, task, deadline, interval, timing }) => {
       const allowed = CanManageSchedule({ requester, household });
-      const exists = TaskScheduling._get({ task }).is({ group: household });
+      const exists = TaskScheduling._activeTask({ task }).is({ group: household });
       const modifiable = AssignmentIsModifiable({ task, household });
       const input = { session, household, task, ...(field === "deadline" ? { deadline } : field === "interval" ? { interval } : {}) };
       const conversion = field === "deadline" ? [compute(assignmentDate, { value: deadline }, timing)]
@@ -246,6 +274,15 @@ function taskChange(path: string, field: "deadline" | "interval" | undefined) {
 }
 
 const RemoveTask = taskChange("tasks/remove", undefined);
+const DeleteAssignment = route("tasks/delete", { task: text }, ({ session, requester, household, task }) => {
+  const allowed = CanManageSchedule({ requester, household });
+  return receive({ session, household, task }).then(Sessioning.use({ session }).responds({ subject: requester })).then(
+    missingHousehold(household), denied(household, allowed),
+    where(allowed).then(TaskScheduling.archiveAssignment({ group: household, task }).responds({ task }))
+      .then(respond({ task })).named("deleted"),
+  );
+});
+
 const UpdateDeadline = taskChange("tasks/deadline", "deadline");
 const UpdateInterval = taskChange("tasks/interval", "interval");
 
@@ -257,16 +294,18 @@ const windowReads = (from: symbol, until: symbol, fromDate: symbol, untilDate: s
 
 function automatic(path: string, weekly: boolean) {
   const fields = weekly ? windowFields : { ...windowFields, onlyUnassigned: (value: unknown) => typeof value === "boolean" };
-  return route(path, fields, ({ session, requester, household, from, until, onlyUnassigned, fromDate, untilDate, people, preferences, scheduled, unassigned }) => {
+  return route(path, fields, ({ session, requester, household, from, until, onlyUnassigned, fromDate, untilDate, people, preferences, chorePreferences, items, usablePreferences, scheduled, unassigned }) => {
     const allowed = CanManageSchedule({ requester, household });
     return receive({ session, household, from, until, ...(!weekly && { onlyUnassigned }) })
       .then(Sessioning.use({ session }).responds({ subject: requester })).then(
         missingHousehold(household), denied(household, allowed),
         where(allowed, ...windowReads(from, until, fromDate, untilDate),
-          HouseholdManaging._schedulingInputs({ household }).is({ people, preferences }))
+          HouseholdManaging._schedulingInputs({ household }).is({ people, preferences, chorePreferences }),
+          ChoreCataloguing._catalogItems({ group: household }).is({ items }),
+          compute(activeChorePreferences, { chorePreferences, items }, usablePreferences))
           .then(TaskScheduling.autoSchedule({
             group: household, from: fromDate, until: untilDate, onlyUnassigned: weekly ? true : onlyUnassigned,
-            people, preferences,
+            people, preferences, chorePreferences: usablePreferences,
           }).responds({ scheduled, unassigned })).then(respond({ scheduled, unassigned })).named("scheduled"),
       );
   });
@@ -308,9 +347,31 @@ const GetSchedule = route("schedule", windowFields, ({ session, requester, house
   );
 });
 
+const AssignmentList = former(
+  "the assignments of (household) from (from) until (until)",
+  ({ household, from, until }, { task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, endsAt }) =>
+    each(TaskScheduling._assignments({ group: household, from, until })
+      .is({ task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, endsAt }))
+      .form({
+        task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, endsAt,
+        chore: whether(ChoreDetails({ item, household })),
+      }),
+);
+
+const GetAssignments = route("list", windowFields, ({ session, requester, household, from, until, fromDate, untilDate }) => {
+  const allowed = CanManageSchedule({ requester, household });
+  return receive({ session, household, from, until }).then(Sessioning.use({ session }).responds({ subject: requester })).then(
+    missingHousehold(household), denied(household, allowed),
+    where(allowed, ...windowReads(from, until, fromDate, untilDate), is.ge(fromDate, untilDate))
+      .then(respond({ error: "SCHEDULE_WINDOW_INVALID" })).named("invalidWindow"),
+    where(allowed, ...windowReads(from, until, fromDate, untilDate), is.lt(fromDate, untilDate))
+      .then(respond({ assignments: AssignmentList({ household, from: fromDate, until: untilDate }) })).named("assignments"),
+  );
+});
+
 const GetTask = route("task", { task: text }, ({ session, requester, household, task, asOf }) => {
   const allowed = CanReadSchedule({ requester, household });
-  const exists = TaskScheduling._get({ task }).is({ group: household });
+  const exists = TaskScheduling._activeTask({ task }).is({ group: household });
   return receive({ session, household, task }).then(Sessioning.use({ session }).responds({ subject: requester })).then(
     missingHousehold(household), denied(household, allowed),
     where(allowed, no(exists)).then(respond({ error: "NOT_FOUND" })).named("missingTask"),
@@ -369,7 +430,7 @@ export const composition = {
   CanManageSchedule, CanReadSchedule, CanEditAvailability, CanReadHouseholdDetails,
   ValidHouseholdChore, AssignmentIsModifiable, HouseholdPreferences,
   PersonAvailability, ResidentWorkload, HouseholdOverview, ChoreDetails, ScheduleTaskDetails, HouseholdSchedule, PersonalTaskMatches, MyTasks,
-  ResidentRemoved, RetryResidentCleanup, AddAvailability, EditAvailability, RemoveAvailability, CreateTask, RemoveTask,
+  ResidentRemoved, RetryResidentCleanup, AddAvailability, EditAvailability, RemoveAvailability, CreateTask, CreateTaskBatch, RemoveTask, DeleteAssignment,
   UpdateDeadline, UpdateInterval, AutoSchedule, WeeklyAutoSchedule, Reset, SetSchedule,
-  GetSchedule, GetTask, GetMyTasks, GetTotal, GetAvailability, GetHouseholdOverview,
+  GetSchedule, AssignmentList, GetAssignments, GetTask, GetMyTasks, GetTotal, GetAvailability, GetHouseholdOverview,
 };

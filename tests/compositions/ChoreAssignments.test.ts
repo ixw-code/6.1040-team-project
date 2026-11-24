@@ -93,6 +93,96 @@ describe("ChoreAssignments", () => {
     expect((await request("tasks/remove", { task: removable }, owner.cookie)).status).toBe(404);
   });
 
+  test("creates the whole weekly series once and rejects an invalid series without adding tasks", async () => {
+    const { request, owner, resident, application, household, category, chore } = await setup();
+    const nextWeek = (hour: number) => new Date(Date.UTC(2027, 0, 11, hour)).toISOString();
+    const windows = [interval(2, 3), { start: nextWeek(2), end: nextWeek(3) }];
+    const input = { chore, windows, batchId: crypto.randomUUID() };
+    expect((await request("tasks/create-batch", input)).status).toBe(401);
+    expect((await request("tasks/create-batch", input, resident.cookie)).status).toBe(403);
+    expect((await request("tasks/create-batch", { ...input, chore: "missing" }, owner.cookie)).status).toBe(404);
+    const invalid = { ...input, windows: [windows[0], { start: nextWeek(3), end: nextWeek(2) }] };
+    expect((await request("tasks/create-batch", invalid, owner.cookie)).status).toBe(400);
+    const scheduling = application.concepts.TaskScheduling;
+    expect(await scheduling._tasks({ group: household })).toEqual([]);
+
+    const create = () => request("tasks/create-batch", input, owner.cookie);
+    const [first, retry] = await Promise.all([create(), create()]);
+    expect(first.status).toBe(200);
+    expect(retry.body).toEqual(first.body);
+    const { tasks } = first.body;
+    expect(tasks).toHaveLength(2);
+    expect(tasks[0].task).not.toBe(tasks[1].task);
+    expect(await scheduling._tasks({ group: household })).toMatchObject(windows.map(({ start, end }, index) => ({
+      ...tasks[index], item: chore, category, weight: 3, start: new Date(start), end: new Date(end), deadline: new Date(end),
+    })));
+
+    // Previously saved weekly batches have dated task IDs and no repeat flag.
+    await database().collection<{ _id: string }>("task_scheduling_groups").updateOne(
+      { _id: household, "taskBatches.batchId": input.batchId },
+      { $unset: { "taskBatches.$.repeatWeekly": "" } },
+    );
+    expect(await request("list", { from: at(1), until: nextWeek(4) }, owner.cookie)).toMatchObject({
+      status: 200, body: { assignments: [{ task: tasks[0].task, weekly: true, occurrences: 2 }] },
+    });
+  });
+
+  test("counts a weekly series once and keeps one assignee through its open dates", async () => {
+    const { request, application, household, owner, resident, chore } = await setup();
+    const next = (hour: number) => new Date(Date.UTC(2027, 0, 11, hour)).toISOString();
+    const windows = [interval(2, 3), { start: next(2), end: next(3) }];
+    const firstWeek = { from: at(1), until: next(1) };
+    const secondWeek = { from: next(1), until: next(8) };
+    const created = await request("tasks/create-batch", { chore, windows, batchId: crypto.randomUUID(), repeatWeekly: true }, owner.cookie);
+    expect(created.status).toBe(200);
+    const [first, second] = created.body.tasks.map(({ task }: { task: string }) => task);
+    const entireSeries = { from: at(1), until: next(8) };
+    expect((await request("list", firstWeek, resident.cookie)).status).toBe(403);
+    expect(await request("list", entireSeries, owner.cookie)).toMatchObject({
+      status: 200, body: { assignments: [{ task: first, weekly: true, occurrences: 2, remaining: 2, assignee: null }] },
+    });
+
+    const availability = (window: object, person: string) => request("availability/add", { person, ...window }, owner.cookie);
+    await availability(windows[0], resident.person);
+    await availability(windows[1], owner.person);
+    const schedule = (window: object) => request("weekly", window, owner.cookie);
+    expect(await schedule(entireSeries)).toMatchObject({ status: 200, body: { scheduled: [], unassigned: [{ task: first }] } });
+    const added = await availability(windows[1], resident.person);
+    expect(await schedule(firstWeek)).toMatchObject({ status: 200, body: { scheduled: [{ task: first, person: resident.person }] } });
+    expect(await schedule(secondWeek)).toMatchObject({ status: 200, body: { scheduled: [], unassigned: [] } });
+
+    const tasks = () => application.concepts.TaskScheduling._tasks({ group: household });
+    expect((await tasks()).map(task => task.assignee)).toEqual([resident.person, resident.person]);
+    expect(await request("availability/remove", { person: resident.person, availability: added.body.availability }, resident.cookie))
+      .toMatchObject({ status: 200, body: { freed: [] } });
+    expect((await tasks()).map(task => task.assignee)).toEqual([resident.person, resident.person]);
+
+    const assign = (entries: object[]) => request("set", { entries }, owner.cookie);
+    expect((await assign([{ task: first, assignee: owner.person }, { task: second, assignee: resident.person }])).status).toBe(400);
+    expect((await tasks()).map(task => task.assignee)).toEqual([resident.person, resident.person]);
+
+    await application.concepts.TaskScheduling.complete({ task: first, completedBy: resident.person, completedAt: new Date(at(3)) });
+    // A manual assignment commits the whole series even before future availability is entered.
+    await request("availability/edit", { windows: [windows[1]], adding: false }, owner.cookie);
+    expect((await assign([{ task: second, assignee: owner.person }])).status).toBe(200);
+    expect(await tasks()).toMatchObject([
+      { task: first, assignee: resident.person, completedBy: resident.person },
+      { task: second, assignee: owner.person, source: "MANUAL" },
+    ]);
+    expect(await request("list", secondWeek, owner.cookie)).toMatchObject({
+      status: 200, body: { assignments: [{ task: second, weekly: true, remaining: 1, assignee: owner.person }] },
+    });
+    expect((await assign([{ task: second }])).status).toBe(200);
+    expect((await tasks()).map(task => task.assignee)).toEqual([resident.person, undefined]);
+    expect((await request("tasks/delete", { task: second })).status).toBe(401);
+    expect((await request("tasks/delete", { task: second }, resident.cookie)).status).toBe(403);
+    expect((await request("tasks/delete", { task: second }, owner.cookie)).status).toBe(200);
+    expect((await request("tasks/delete", { task: second }, owner.cookie)).status).toBe(200);
+    expect(await request("list", entireSeries, owner.cookie)).toMatchObject({ status: 200, body: { assignments: [] } });
+    expect(await request("schedule", entireSeries, resident.cookie)).toMatchObject({ status: 200, body: { tasks: [] } });
+    expect(await tasks()).toMatchObject([{ task: first, completedBy: resident.person }, { task: second }]);
+  });
+
   test("runs manual, automatic and weekly scheduling and serves household and personal reads", async () => {
     const { request, invoke, createTask, owner, resident, outsider, application, household, chore } = await setup();
     expect((await request("availability/add", { person: resident.person, ...interval(1, 8) }, owner.cookie)).status).toBe(200);

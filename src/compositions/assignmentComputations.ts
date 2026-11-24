@@ -35,3 +35,14 @@ export function assignmentIsIncomplete({ completedAt }: { completedAt?: Date }):
 export function availabilityWindows({ windows }: { windows: { start: string; end: string }[] }) {
   return windows.map(({ start, end }) => ({ start: new Date(start), end: new Date(end) }));
 }
+
+export function assignmentCategory({ category }: { category?: string }) {
+  return { category, present: category !== undefined };
+}
+
+export function activeChorePreferences({
+  chorePreferences, items,
+}: { chorePreferences: { person: string; order: string[] }[]; items: string[] }) {
+  const active = new Set(items);
+  return chorePreferences.map(({ person, order }) => ({ person, order: order.filter(chore => active.has(chore)) }));
+}

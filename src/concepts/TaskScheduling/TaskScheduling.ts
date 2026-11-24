@@ -1,4 +1,5 @@
 import { MongoServerError, type Db } from "mongodb";
+import { maxAssignmentOccurrences } from "../../shared/assignmentDates.ts";
 
 export class TaskNotFound extends Error {}
 export class TaskWeightInvalid extends Error {}
@@ -22,22 +23,31 @@ type AvailabilityRef = { availability: string };
 type Window = { from: Date; until: Date };
 type ScheduleEntry = TaskRef & { assignee?: string };
 type Preference = PersonRef & { category: string; preferenceLevel: PreferenceLevel };
+type ChorePreference = PersonRef & { order: string[] };
 type Completion = { completedBy: string; completedAt: Date };
 type TaskDefinition = {
   item: string;
-  category: string;
+  category?: string;
   weight: number;
   deadline?: Date;
   interval?: Interval;
 };
-type Task = TaskRef & TaskDefinition & Partial<Completion> & { assignee?: string; source?: Source };
-type TaskRow = Omit<Task, "interval"> & { start?: Date; end?: Date };
+type Task = TaskRef & TaskDefinition & Partial<Completion> & { assignee?: string; source?: Source; archived?: boolean };
+type TaskRow = Omit<Task, "interval" | "archived"> & { start?: Date; end?: Date };
 type Availability = AvailabilityRef & PersonRef & { interval: Interval };
-type GroupState = { _id: string; version: number; tasks: Task[]; availabilities: Availability[] };
+type TaskBatch = { batchId: string; tasks: TaskRef[]; repeatWeekly?: boolean };
+type Assignment = { tasks: Task[]; batch?: TaskBatch };
+type GroupState = { _id: string; version: number; tasks: Task[]; availabilities: Availability[]; taskBatches?: TaskBatch[] };
 
 const taskMissing = "This task doesn't exist in the schedule.";
 const availabilityMissing = "There is no such availability.";
 const costMultiplier: Record<PreferenceLevel, number> = { PREFER: 0.5, NEUTRAL: 1, AVOID: 2 };
+
+function requireWeight(weight: number): void {
+  if (!Number.isFinite(weight) || weight < 1 || weight > 10) {
+    throw new TaskWeightInvalid("Task weight must be between 1 and 10.");
+  }
+}
 
 function validDate(value: Date): boolean {
   return value instanceof Date && Number.isFinite(value.getTime());
@@ -82,7 +92,7 @@ function availableFor(state: GroupState, person: string, interval: Interval): bo
 function clearAssignments(tasks: Task[], matches: (task: Task) => boolean): TaskRef[] {
   const cleared: TaskRef[] = [];
   for (const task of tasks) {
-    if (task.assignee !== undefined && !isCompleted(task) && matches(task)) {
+    if (task.assignee !== undefined && !task.archived && !isCompleted(task) && matches(task)) {
       clearAssignment(task);
       cleared.push({ task: task.task });
     }
@@ -92,8 +102,11 @@ function clearAssignments(tasks: Task[], matches: (task: Task) => boolean): Task
 
 function workloadByPerson(tasks: Task[]): Map<string, number> {
   const workloads = new Map<string, number>();
-  for (const { assignee, weight } of tasks) {
-    if (assignee !== undefined) workloads.set(assignee, (workloads.get(assignee) ?? 0) + weight);
+  for (const task of tasks) {
+    const { assignee, weight } = task;
+    if (assignee !== undefined && (!task.archived || isCompleted(task))) {
+      workloads.set(assignee, (workloads.get(assignee) ?? 0) + weight);
+    }
   }
   return workloads;
 }
@@ -113,6 +126,58 @@ function taskOrder(a: Task, b: Task): number {
   return taskStart(a).getTime() - taskStart(b).getTime() || a.task.localeCompare(b.task);
 }
 
+function weeklyCadence(tasks: Task[]): boolean {
+  if (tasks.length < 2 || tasks.some(task => !task.interval)) return false;
+  const week = 7 * 24 * 60 * 60 * 1000;
+  const first = taskStart(tasks[0]).getTime();
+  let previousWeek = 0;
+  for (const task of tasks.slice(1)) {
+    const elapsed = taskStart(task).getTime() - first;
+    const weeks = Math.round(elapsed / week);
+    if (weeks <= previousWeek || Math.abs(elapsed - weeks * week) > 2 * 60 * 60 * 1000) return false;
+    previousWeek = weeks;
+  }
+  return true;
+}
+
+function recurringAssignments(state: GroupState): Map<Task, Assignment> {
+  const byId = new Map(state.tasks.map(task => [task.task, task]));
+  const recurring = new Map<Task, Assignment>();
+  for (const batch of state.taskBatches ?? []) {
+    const tasks = batch.tasks.flatMap(({ task }) => byId.get(task) ?? []).sort(taskOrder);
+    // Older weekly batches have no repeat flag. Recognize their stored weekly cadence.
+    if (!(batch.repeatWeekly ?? weeklyCadence(tasks))) continue;
+    const assignment: Assignment = { tasks, batch };
+    for (const task of tasks) recurring.set(task, assignment);
+  }
+  return recurring;
+}
+
+function assignments(state: GroupState): Assignment[] {
+  const recurring = recurringAssignments(state);
+  const grouped = new Set<Assignment>();
+  for (const task of state.tasks) grouped.add(recurring.get(task) ?? { tasks: [task] });
+  return [...grouped].sort((left, right) => taskOrder(left.tasks[0], right.tasks[0]));
+}
+
+function openTasks(assignment: Assignment): Task[] {
+  return assignment.tasks.filter(task => !task.archived && !isCompleted(task));
+}
+
+function touchesWindow(open: Task[], window: Window): boolean {
+  return open.some(task => inWindow(task.interval?.start, window));
+}
+
+function canReset(open: Task[]): boolean {
+  return open.every(task => task.source !== "MANUAL");
+}
+
+function clearUnavailable(state: GroupState, person: string): TaskRef[] {
+  const recurring = recurringAssignments(state);
+  return clearAssignments(state.tasks, task =>
+    task.assignee === person && !recurring.has(task) && !availableFor(state, person, task.interval!));
+}
+
 function completionOrder(a: Task & Completion, b: Task & Completion): number {
   return a.completedAt.getTime() - b.completedAt.getTime() || a.task.localeCompare(b.task);
 }
@@ -121,7 +186,7 @@ function inWindow(value: Date | undefined, { from, until }: Window): boolean {
   return value !== undefined && value >= from && value < until;
 }
 
-function taskRow({ interval, ...task }: Task): TaskRow {
+function taskRow({ interval, archived: _archived, ...task }: Task): TaskRow {
   return interval ? { ...task, start: interval.start, end: interval.end } : task;
 }
 
@@ -157,12 +222,12 @@ export class TaskSchedulingConcept {
     }
   }
 
-  async #updateTask<Result>(task: string, change: (entry: Task, state: GroupState) => Result): Promise<Result> {
+  async #updateTask<Result>(task: string, change: (entry: Task, state: GroupState) => Result, includeArchived = false): Promise<Result> {
     const group = await this.#groups().findOne({ "tasks.task": task }, { projection: { _id: 1 } });
     if (!group) throw new TaskNotFound(taskMissing);
     return this.#update(group._id, (state) => {
       const entry = state.tasks.find((candidate) => candidate.task === task);
-      if (!entry) throw new TaskNotFound(taskMissing);
+      if (!entry || (!includeArchived && entry.archived)) throw new TaskNotFound(taskMissing);
       return change(entry, state);
     });
   }
@@ -173,23 +238,61 @@ export class TaskSchedulingConcept {
   }
 
   async add({ group, item, category, weight, deadline, interval }: GroupRef & TaskDefinition): Promise<TaskRef> {
-    if (!Number.isFinite(weight) || weight < 1 || weight > 10) {
-      throw new TaskWeightInvalid("Task weight must be between 1 and 10.");
-    }
+    requireWeight(weight);
     if (!validTiming(deadline, interval)) {
       throw new TaskIntervalInvalid("Provide a deadline or a valid interval that ends by the deadline when both are given.");
     }
     const task = crypto.randomUUID();
     const due = deadline ?? interval!.end;
     return this.#update(group, (state) => {
-      state.tasks.push({ task, item, category, weight, deadline: due, ...(interval && { interval }) });
+      state.tasks.push({ task, item, weight, deadline: due,
+        ...(category !== undefined && { category }), ...(interval && { interval }),
+      });
       return { task };
     }, true);
+  }
+
+  async addBatch({ group, item, category, weight, intervals, batchId, repeatWeekly = false }: GroupRef
+    & Pick<TaskDefinition, "item" | "category" | "weight"> & {
+      intervals: Interval[];
+      batchId: string;
+      repeatWeekly?: boolean;
+    }): Promise<{ tasks: TaskRef[] }> {
+    requireWeight(weight);
+    if (!intervals.length || intervals.length > maxAssignmentOccurrences
+      || intervals.some(({ start, end }) => !validInterval(start, end))) {
+      throw new TaskIntervalInvalid(`Provide between 1 and ${maxAssignmentOccurrences} valid task intervals.`);
+    }
+
+    const entries = intervals.map(interval => ({
+      task: crypto.randomUUID(), item, weight, deadline: interval.end, interval,
+      ...(category !== undefined && { category }),
+    }));
+    const tasks = entries.map(({ task }) => ({ task }));
+    return this.#update(group, state => {
+      const previous = state.taskBatches?.find(batch => batch.batchId === batchId);
+      if (previous) return { tasks: previous.tasks };
+      state.tasks.push(...entries);
+      (state.taskBatches ??= []).push({ batchId, tasks, repeatWeekly });
+      return { tasks };
+    }, true);
+  }
+
+  async archiveAssignment({ group, task }: GroupRef & TaskRef): Promise<TaskRef> {
+    return this.#update(group, state => {
+      const entry = state.tasks.find(candidate => candidate.task === task);
+      if (!entry) throw new TaskNotFound(taskMissing);
+      const series = recurringAssignments(state).get(entry);
+      for (const occurrence of series?.tasks ?? [entry]) occurrence.archived = true;
+      return { task };
+    });
   }
 
   async remove({ task }: TaskRef): Promise<TaskRef> {
     return this.#updateTask(task, (entry, state) => {
       if (isCompleted(entry)) throw new TaskStatusConflict("A completed task cannot be removed.");
+      const batch = recurringAssignments(state).get(entry)?.batch;
+      if (batch) batch.repeatWeekly = true;
       state.tasks.splice(state.tasks.indexOf(entry), 1);
       return { task };
     });
@@ -210,15 +313,17 @@ export class TaskSchedulingConcept {
   async updateInterval({ task, interval }: TaskRef & { interval?: Interval }): Promise<TaskRef> {
     return this.#updateTask(task, (entry, state) => {
       if (isCompleted(entry)) throw new TaskStatusConflict("A completed task cannot be rescheduled.");
-      if (!validTiming(entry.deadline, interval)) {
-        throw new TaskIntervalInvalid("Provide a valid interval that ends by the deadline, or keep a deadline when clearing the interval.");
+      const batch = recurringAssignments(state).get(entry)?.batch;
+      if (!validTiming(entry.deadline, interval) || (batch && interval === undefined)) {
+        throw new TaskIntervalInvalid("Provide a valid interval that ends by the deadline, or keep a deadline when clearing a standalone interval.");
       }
       if (interval === undefined) {
         delete entry.interval;
         clearAssignment(entry);
       } else {
         entry.interval = interval;
-        if (entry.assignee !== undefined && !availableFor(state, entry.assignee, interval)) clearAssignment(entry);
+        if (batch) batch.repeatWeekly = true;
+        else if (entry.assignee !== undefined && !availableFor(state, entry.assignee, interval)) clearAssignment(entry);
       }
       return { task };
     });
@@ -259,8 +364,7 @@ export class TaskSchedulingConcept {
           return remaining;
         });
       }
-      return { freed: adding ? [] : clearAssignments(state.tasks, task =>
-        task.assignee === person && !availableFor(state, person, task.interval!)) };
+      return { freed: adding ? [] : clearUnavailable(state, person) };
     }, adding);
   }
 
@@ -271,9 +375,7 @@ export class TaskSchedulingConcept {
       const index = state.availabilities.findIndex((entry) => entry.availability === availability);
       if (index < 0) throw new AvailabilityNotFound(availabilityMissing);
       const [{ person }] = state.availabilities.splice(index, 1);
-      return { freed: clearAssignments(state.tasks, (task) =>
-        task.assignee === person && !availableFor(state, person, task.interval!),
-      ) };
+      return { freed: clearUnavailable(state, person) };
     });
   }
 
@@ -287,19 +389,23 @@ export class TaskSchedulingConcept {
   async setSchedule({ group, entries }: GroupRef & { entries: ScheduleEntry[] }): Promise<{ entries: ScheduleEntry[] }> {
     return this.#update(group, (state) => {
       const tasks = new Map(state.tasks.map((task) => [task.task, task]));
+      const recurring = recurringAssignments(state);
       const selected = new Map<Task, string | undefined>();
       for (const entry of entries) {
         const task = tasks.get(entry.task);
-        if (!task) throw new TaskNotFound("One of these tasks is not on this schedule.");
+        if (!task || task.archived) throw new TaskNotFound("One of these tasks is not on this schedule.");
         if (isCompleted(task)) throw new TaskStatusConflict("A completed task cannot be reassigned.");
-        if (!task.interval) throw new TaskIntervalInvalid("Task must have a scheduled interval before assignment.");
-        if (selected.has(task) && selected.get(task) !== entry.assignee) {
-          throw new ScheduleEntriesInvalid("A task cannot have conflicting assignments in one batch.");
+        const series = recurring.get(task);
+        for (const occurrence of series ? openTasks(series) : [task]) {
+          if (!occurrence.interval) throw new TaskIntervalInvalid("Task must have a scheduled interval before assignment.");
+          if (selected.has(occurrence) && selected.get(occurrence) !== entry.assignee) {
+            throw new ScheduleEntriesInvalid("A task cannot have conflicting assignments in one batch.");
+          }
+          if (!series && entry.assignee !== undefined && !availableFor(state, entry.assignee, occurrence.interval)) {
+            throw new PersonNotAvailable("An assignee is not available for this task.");
+          }
+          selected.set(occurrence, entry.assignee);
         }
-        if (entry.assignee !== undefined && !availableFor(state, entry.assignee, task.interval)) {
-          throw new PersonNotAvailable("An assignee is not available for this task.");
-        }
-        selected.set(task, entry.assignee);
       }
       for (const [task, assignee] of selected) {
         if (assignee === undefined) clearAssignment(task);
@@ -312,9 +418,10 @@ export class TaskSchedulingConcept {
     });
   }
 
-  async autoSchedule({ group, from, until, people, preferences, onlyUnassigned }: GroupRef & Window & {
+  async autoSchedule({ group, from, until, people, preferences, chorePreferences = [], onlyUnassigned }: GroupRef & Window & {
     people: PersonRef[];
     preferences: Preference[];
+    chorePreferences?: ChorePreference[];
     onlyUnassigned: boolean;
   }): Promise<{ scheduled: (TaskRef & PersonRef)[]; unassigned: TaskRef[] }> {
     const window = { from, until };
@@ -330,21 +437,41 @@ export class TaskSchedulingConcept {
       levels.set(category, preferenceLevel);
     }
 
+    const choreCosts = new Map<string, Map<string, number>>();
+    for (const { person, order } of chorePreferences) {
+      if (!candidates.has(person) || choreCosts.has(person) || new Set(order).size !== order.length) {
+        throw new PreferencesInvalid("The supplied preferences are invalid.");
+      }
+      const lastRank = Math.max(order.length - 1, 1);
+      choreCosts.set(person, new Map(order.map((chore, index) => [chore, 0.5 + index / lastRank])));
+    }
+
     return this.#update(group, (state) => {
-      const tasks = state.tasks.filter((task) => !isCompleted(task) && inWindow(task.interval?.start, window))
-        .sort(taskOrder);
-      if (!onlyUnassigned) clearAssignments(tasks, (task) => task.source === "AUTO");
+      const selected = assignments(state).flatMap(assignment => {
+        const open = openTasks(assignment);
+        const task = open.find(task => inWindow(task.interval?.start, window));
+        return task ? [{ task, open }] : [];
+      }).sort((left, right) => taskOrder(left.task, right.task));
+
+      if (!onlyUnassigned) {
+        for (const { open } of selected) {
+          if (canReset(open)) clearAssignments(open, task => task.source === "AUTO");
+        }
+      }
 
       const workloads = workloadByPerson(state.tasks);
       const scheduled: (TaskRef & PersonRef)[] = [];
       const unassigned: TaskRef[] = [];
-      for (const task of tasks) {
-        if (task.assignee !== undefined) continue;
+      for (const { task, open } of selected) {
+        if (open.some(occurrence => occurrence.assignee !== undefined)) continue;
         let lowestCost = Infinity;
         let tied: string[] = [];
         for (const [person, levels] of candidates) {
-          if (!availableFor(state, person, task.interval!)) continue;
-          const multiplier = costMultiplier[levels.get(task.category) ?? "NEUTRAL"];
+          if (!open.every(occurrence => occurrence.interval && availableFor(state, person, occurrence.interval))) continue;
+          const ranking = choreCosts.get(person);
+          const multiplier = ranking
+            ? ranking.get(task.item) ?? 1
+            : costMultiplier[task.category ? levels.get(task.category) ?? "NEUTRAL" : "NEUTRAL"];
           const cost = (workloads.get(person) ?? 0) + task.weight * multiplier;
           if (cost < lowestCost) {
             lowestCost = cost;
@@ -356,9 +483,11 @@ export class TaskSchedulingConcept {
           continue;
         }
         const person = tied[Math.floor(Math.random() * tied.length)];
-        task.assignee = person;
-        task.source = "AUTO";
-        workloads.set(person, (workloads.get(person) ?? 0) + task.weight);
+        for (const occurrence of open) {
+          occurrence.assignee = person;
+          occurrence.source = "AUTO";
+          workloads.set(person, (workloads.get(person) ?? 0) + occurrence.weight);
+        }
         scheduled.push({ task: task.task, person });
       }
       return { scheduled, unassigned };
@@ -368,8 +497,12 @@ export class TaskSchedulingConcept {
   async reset({ group, from, until }: GroupRef & Window): Promise<{ cleared: TaskRef[] }> {
     const window = { from, until };
     requireWindow(window);
-    return this.#update(group, (state) => ({
-      cleared: clearAssignments(state.tasks, (task) => task.source === "AUTO" && inWindow(task.interval?.start, window)),
+    return this.#update(group, state => ({
+      cleared: assignments(state).flatMap(assignment => {
+        const open = openTasks(assignment);
+        if (!touchesWindow(open, window) || !canReset(open)) return [];
+        return clearAssignments(open, task => task.source === "AUTO");
+      }),
     }));
   }
 
@@ -380,7 +513,7 @@ export class TaskSchedulingConcept {
       entry.completedBy = completedBy;
       entry.completedAt = completedAt;
       return { task, completedBy, completedAt };
-    });
+    }, true);
   }
 
   async uncomplete({ task }: TaskRef): Promise<TaskRef & { lastCompletedBy: string; lastCompletedAt: Date }> {
@@ -390,9 +523,45 @@ export class TaskSchedulingConcept {
       const reopened: Task = entry;
       delete reopened.completedBy;
       delete reopened.completedAt;
-      if (entry.assignee !== undefined && !availableFor(state, entry.assignee, entry.interval!)) clearAssignment(entry);
+      const series = recurringAssignments(state).get(entry);
+      if (series) {
+        const other = openTasks(series).find(task => task !== entry);
+        if (other) {
+          clearAssignment(entry);
+          if (other.assignee !== undefined) {
+            entry.assignee = other.assignee;
+            entry.source = other.source;
+          }
+        }
+      } else if (entry.assignee !== undefined && !availableFor(state, entry.assignee, entry.interval!)) {
+        clearAssignment(entry);
+      }
       return { task, lastCompletedBy, lastCompletedAt };
     });
+  }
+
+  async _assignments({ group, from, until }: GroupRef & Window) {
+    const state = await this.#groups().findOne({ _id: group }, { projection: { tasks: 1, taskBatches: 1 } });
+    const window = { from, until };
+    const rows = (state ? assignments(state) : []).flatMap(assignment => {
+      const { tasks, batch } = assignment;
+      const visible = tasks.find(task => !task.archived
+        && (inWindow(task.interval?.start, window) || inWindow(task.deadline, window)));
+      if (!visible) return [];
+      const open = openTasks(assignment);
+      const assignees = new Set(open.map(task => task.assignee));
+      const first = tasks[0];
+      const last = tasks[tasks.length - 1];
+      const representative = open.includes(visible) ? visible : open[0] ?? visible;
+      return [{
+        task: representative.task, item: first.item, weekly: Boolean(batch), occurrences: tasks.length, remaining: open.length,
+        mixed: assignees.size > 1,
+        assignee: open.length ? (assignees.size > 1 ? null : open[0].assignee ?? null) : last.completedBy ?? null,
+        startsAt: taskStart(first),
+        endsAt: last.deadline ?? last.interval!.end,
+      }];
+    });
+    return rows;
   }
 
   async _get({ task }: TaskRef): Promise<(GroupRef & Omit<Task, "task">)[]> {
@@ -402,14 +571,19 @@ export class TaskSchedulingConcept {
     return [{ group: state._id, ...details }];
   }
 
+  async _activeTask({ task }: TaskRef): Promise<GroupRef[]> {
+    const [entry] = await this._get({ task });
+    return entry && !entry.archived ? [{ group: entry.group }] : [];
+  }
+
   async _tasks({ group }: GroupRef): Promise<TaskRow[]> {
     return (await this.#tasks(group)).sort(taskOrder).map(taskRow);
   }
 
   async _schedule({ group, from, until }: GroupRef & Window): Promise<TaskRow[]> {
     const window = { from, until };
-    return (await this.#tasks(group)).filter((task) => inWindow(task.interval?.start, window)
-      || inWindow(task.deadline, window)).sort(taskOrder).map(taskRow);
+    return (await this.#tasks(group)).filter(task => !task.archived
+      && (inWindow(task.interval?.start, window) || inWindow(task.deadline, window))).sort(taskOrder).map(taskRow);
   }
 
   async _pending({ group, asOf }: GroupRef & { asOf: Date }): Promise<
@@ -417,7 +591,7 @@ export class TaskSchedulingConcept {
   > {
     const tasks = await this.#tasks(group);
     const now = this.now();
-    return tasks.filter((task) => !isCompleted(task) && startsOrDueAfter(task, asOf)).sort(taskOrder)
+    return tasks.filter((task) => !task.archived && !isCompleted(task) && startsOrDueAfter(task, asOf)).sort(taskOrder)
       .map((task) => ({
         task: task.task,
         item: task.item,

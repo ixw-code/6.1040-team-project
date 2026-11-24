@@ -203,3 +203,7 @@ textarea[aria-invalid="true"] { border-color: #b7554c; }
 .field-error, .refusal { color: var(--red); }
 
 .settings-fields { border: 0; margin: 0; padding: 0; display: grid; gap: 1rem; }
+
+
+.button-delete { color: var(--red); background: var(--paper); border: 1px solid var(--line); }
+.button-delete:hover { border-color: var(--red); }

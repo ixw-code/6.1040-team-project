@@ -4,10 +4,10 @@ import { api } from "./api.ts";
 import { checked, useHousehold } from "./household.ts";
 
 const emit = defineEmits<{ changed: [] }>();
-const { home, catalog, categories, person, refresh } = useHousehold();
+const { home, catalog, person, refresh } = useHousehold();
 const household = home.household;
 const manager = home.overseer === person;
-const name = ref(home.name), target = ref(""), category = ref(""), categoryName = ref("");
+const name = ref(home.name), target = ref("");
 const error = ref(""), message = ref(""), busy = ref(false);
 type ResidentOverview = { person: string; workload: number; availability: { interval: { start: string; end: string } }[] };
 const overview = ref<ResidentOverview[]>([]);
@@ -38,11 +38,6 @@ function transfer() {
     void run(() => api.households.overseer({ household, person: target.value }), "Oversight transferred.", true);
   }
 }
-function removeCategory() {
-  if (window.confirm("Remove this work category and its resident preferences?")) {
-    void run(() => api.households.categories.remove({ household, category: category.value }), "Category removed.");
-  }
-}
 function removeHome() {
   if (window.confirm(`Remove the household ${home.name}?`)) {
     void run(() => api.households.remove({ household }), "Household removed.", true);
@@ -60,12 +55,6 @@ function removeHome() {
         <option v-for="p in catalog.people.filter(p => p.person !== person)" :key="p.person" :value="p.person">{{ p.username }}</option></select></label>
       <div class="actions-inline"><button class="button button-secondary" :disabled="!target" @click="transfer">Transfer oversight</button>
         <button class="button button-secondary" :disabled="!target" @click="removeMember(target)">Remove resident</button></div>
-      <form @submit.prevent="run(() => api.households.categories.rename({ household, category, name: categoryName }), 'Category renamed.')">
-        <label>Work category<select v-model="category" required><option value="">Choose category</option><option v-for="c in categories" :key="c.category" :value="c.category">{{ c.name }}</option></select></label>
-        <label>New category name<input v-model="categoryName" required maxlength="100"></label>
-        <div class="actions-inline"><button class="button button-secondary" :disabled="!category">Rename category</button>
-          <button class="button button-secondary" type="button" :disabled="!category" @click="removeCategory">Remove category</button></div>
-      </form>
       <h3>Availability and workload</h3>
       <ul><li v-for="row in overview" :key="row.person" class="schedule-row">
         <div><strong>{{ username(row.person) }}</strong> · Assigned effort {{ row.workload }}

@@ -15,7 +15,7 @@ export function completionHooks({ TaskScheduling, ChoreCataloguing, HouseholdMan
         task, household: entry.group, assignee: entry.assignee ?? "", title: chore.name,
         criteria: chore.requirements.join("\n"), photoInstructions: chore.description,
         baseline: chore.references[0] ?? "", dueAt: entry.deadline ?? entry.interval!.end,
-        active: !entry.completedAt, completed: Boolean(entry.completedAt),
+        active: !entry.archived && !entry.completedAt, archived: entry.archived, completed: Boolean(entry.completedAt),
       };
     },
     async role(household, person) {

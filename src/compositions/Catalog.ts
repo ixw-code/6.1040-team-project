@@ -17,7 +17,7 @@ export function createCatalogHandler(
     const url = new URL(request.url);
     const reference = /^\/api\/catalog\/([^/]+)\/references\/([^/]+)$/.exec(url.pathname);
     const operation = url.pathname.slice("/api/catalog/".length);
-    if (!reference && !["list", "create", "add-resident"].includes(operation)) return failure(404, "NOT_FOUND");
+    if (!reference && !["list", "create", "add-resident", "preferences", "delete"].includes(operation)) return failure(404, "NOT_FOUND");
     if (!allowsAppOrigin(request)) return failure(403, "FORBIDDEN");
     if (request.method !== (reference ? "GET" : "POST")) return failure(405, "METHOD_NOT_ALLOWED");
     try {
@@ -38,20 +38,42 @@ export function createCatalogHandler(
       const { household } = body;
       const [home] = await HouseholdManaging._household({ household });
       if (!home) return failure(404, "NOT_FOUND");
-      if (operation === "list") {
+      if (operation === "list" || operation === "preferences") {
         const members = await HouseholdManaging._residents({ household });
         if (!members.some(m => m.person === requester)) return failure(403, "FORBIDDEN");
-        const [chores, ranking, people] = await Promise.all([
+        if (operation === "preferences") {
+          if (Object.keys(body).some(key => key !== "household" && key !== "order")
+            || !Array.isArray(body.order) || !body.order.every(text)) return failure(400, "INVALID_REQUEST");
+          const order: string[] = body.order;
+          const chores = await ChoreCataloguing._chores({ group: household, sortByDifficulty: false });
+          const choreIds = new Set(chores.map(({ chore }) => chore));
+          if (!order.every(chore => choreIds.has(chore))) return failure(404, "NOT_FOUND");
+          const result = await HouseholdManaging.setChoreOrder({ household, person: requester, order });
+          if ("error" in result) {
+            return result.error === "CHORE_ORDER_INVALID" ? failure(400, result.error) : failure(404, "NOT_FOUND");
+          }
+          return Response.json(result);
+        }
+        const [chores, ranking, people, { order }] = await Promise.all([
           ChoreCataloguing._chores({ group: household, sortByDifficulty: false }),
           Ranking._ranking({ group: household }),
           Promise.all(members.map(async ({ person }) => {
             const [account] = await Registering._username({ user: person as User });
             return { person, username: account?.username ?? person };
           })),
+          HouseholdManaging._choreOrder({ household, person: requester }),
         ]);
-        return Response.json({ people, chores, ranking });
+        const choreIds = new Set(chores.map(({ chore }) => chore));
+        return Response.json({ people, chores, ranking, choreOrder: order.filter(chore => choreIds.has(chore)) });
       }
       if (home.overseer !== requester) return failure(403, "FORBIDDEN");
+      if (operation === "delete") {
+        if (!text(body.chore) || Object.keys(body).some(key => key !== "household" && key !== "chore")) {
+          return failure(400, "INVALID_REQUEST");
+        }
+        const result = await ChoreCataloguing.archive({ group: household, chore: body.chore });
+        return "error" in result ? failure(404, "NOT_FOUND") : Response.json(result);
+      }
       if (operation === "add-resident") {
         if (!text(body.username)) return failure(400, "INVALID_REQUEST");
         const [account] = await Registering._byUsername({ username: body.username.trim() });
@@ -60,10 +82,13 @@ export function createCatalogHandler(
         return "error" in result ? failure(409, result.error) : Response.json(result);
       }
       const { name, category, difficulty, description, criteria, photo } = body;
-      if (![name, category, description, criteria, photo].every(text) || !Number.isInteger(difficulty)
-        || difficulty < 1 || difficulty > 10) return failure(400, "INVALID_REQUEST");
-      const categories = await HouseholdManaging._categories({ household });
-      if (!categories.some(c => c.category === category) || !await photos.owns(photo, requester)) return failure(404, "NOT_FOUND");
+      if (![name, description, criteria, photo].every(text) || (category !== undefined && !text(category))
+        || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 10) return failure(400, "INVALID_REQUEST");
+      if (category !== undefined) {
+        const categories = await HouseholdManaging._categories({ household });
+        if (!categories.some(c => c.category === category)) return failure(404, "NOT_FOUND");
+      }
+      if (!await photos.owns(photo, requester)) return failure(404, "NOT_FOUND");
       const result = await ChoreCataloguing.create({
         group: household, name: name.trim(), category, difficulty, description: description.trim(),
         requirements: [criteria.trim()], references: [photo],

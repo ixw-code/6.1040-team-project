@@ -9,6 +9,7 @@ export class CategoryNameInvalid extends Error {}
 export class CategoryNameConflict extends Error {}
 export class CategoryNotFound extends Error {}
 export class PreferenceLevelInvalid extends Error {}
+export class ChoreOrderInvalid extends Error {}
 
 type HouseholdRef = { household: string };
 type PersonRef = { person: string };
@@ -18,6 +19,7 @@ type PreferenceRow = CategoryRef & { preferenceLevel: PreferenceLevel };
 type Category = CategoryRef & { name: string };
 type Resident = PersonRef & {
   residency: string;
+  choreOrder?: string[];
   preferences: Record<string, { preference: string; preferenceLevel: PreferenceLevel }>;
 };
 type Household = {
@@ -189,6 +191,21 @@ export class HouseholdManagingConcept {
     }, () => new HouseholdResidentNotFound("This person is not a resident."));
   }
 
+  async setChoreOrder({ household, person, order }: HouseholdRef & PersonRef & { order: string[] }): Promise<{ order: string[] }> {
+    if (new Set(order).size !== order.length) throw new ChoreOrderInvalid("Rank each chore at most once.");
+    return this.#update(household, state => {
+      const resident = state.residents.find(entry => entry.person === person);
+      if (!resident) throw new HouseholdResidentNotFound("This person is not a resident.");
+      resident.choreOrder = [...order];
+      return { order: resident.choreOrder };
+    });
+  }
+
+  async _choreOrder({ household, person }: HouseholdRef & PersonRef): Promise<{ order: string[] }> {
+    const state = await this.#households().findOne({ _id: household });
+    return { order: state?.residents.find(entry => entry.person === person)?.choreOrder ?? [] };
+  }
+
   async remove({ household }: HouseholdRef): Promise<HouseholdRef> {
     const result = await this.#households().deleteOne({ _id: household });
     if (result.deletedCount === 0) throw new HouseholdNotFound("This household does not exist.");
@@ -229,11 +246,14 @@ export class HouseholdManagingConcept {
   async _schedulingInputs({ household }: HouseholdRef): Promise<{
     people: PersonRef[];
     preferences: (PersonRef & PreferenceRow)[];
+    chorePreferences: (PersonRef & { order: string[] })[];
   }> {
     const state = await this.#households().findOne({ _id: household });
-    if (!state) return { people: [], preferences: [] };
+    if (!state) return { people: [], preferences: [], chorePreferences: [] };
     return {
       people: state.residents.map(({ person }) => ({ person })),
+      chorePreferences: state.residents.flatMap(({ person, choreOrder }) =>
+        choreOrder === undefined ? [] : [{ person, order: choreOrder }]),
       preferences: state.residents.flatMap(({ person, preferences }) =>
         state.categories.map(({ category }) => ({
           person, category, preferenceLevel: preferences[category].preferenceLevel,
