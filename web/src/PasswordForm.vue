@@ -11,7 +11,7 @@ const working = ref(false);
 const words = computed(() =>
   creating.value
     ? { action: "Create account", other: "Have an account?", switchTo: "Sign in" }
-    : { action: "Sign in", other: "New?", switchTo: "Create an account" },
+    : { action: "Sign in", other: "New here?", switchTo: "Create an account" },
 );
 
 async function submit() {

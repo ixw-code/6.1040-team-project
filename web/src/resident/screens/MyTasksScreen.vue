@@ -4,11 +4,9 @@ import StickyNote from "../components/StickyNote.vue";
 import { STATUS_COLOR, STATUS_LABEL, formatDateTime, isOverdue, tilt } from "../display.ts";
 import { useNav } from "../nav.ts";
 import { getMyTasks } from "../residentApi.ts";
-import { useSession } from "../../session.ts";
 import type { Task } from "../types.ts";
 
 const nav = useNav();
-const { me, signOut } = useSession();
 const tasks = ref<Task[] | null>(null);
 const failed = ref(false);
 
@@ -27,12 +25,9 @@ onMounted(async () => {
 <template>
   <section class="rs-screen">
     <header>
-      <div class="top">
-        <h1 class="rs-title rs-heading">My Tasks</h1>
-        <button type="button" class="signout rs-heading" @click="signOut">Sign Out</button>
-      </div>
+      <h1 class="rs-title rs-heading">My Tasks</h1>
       <!-- TODO(backend): household name from HouseholdManaging._householdsByPerson(me). -->
-      <p class="rs-body-text">{{ me?.username ? `Hi ${me.username} · ` : "" }}Maple House · this week</p>
+      <p class="rs-body-text">Maple House · this week</p>
     </header>
 
     <p v-if="failed" class="rs-status-line rs-hand rs-error">Couldn't load your tasks. Try again.</p>
@@ -60,8 +55,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.signout { min-height: 44px; padding: 0; border: 0; background: none; color: var(--rs-ink); font-size: 1.15rem; text-decoration: underline; cursor: pointer; }
 .board { margin: 0; padding: 14px 2px 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 22px 18px; }
 .label { font-size: 17px; }
 .overdue { color: var(--rs-overdue); }

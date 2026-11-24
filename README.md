@@ -2,9 +2,9 @@
 
 A chore coordination app for shared households.
 
-## Design Documentation
+## Deliverables
 
-Find the deliverables for the Project Alpha under [the docs](./design/docs). The compositions and concepts also live under [[./design/compositions/]] and [[./design/concepts/]] respectively.
+Find the deliverables for the Project Alpha under [the docs](./design/docs). Our composition and concept design documentation also live under [compositions/](./design/compositions/) and [concepts/](./design/concepts/) respectively.
 
 ### Demo Video 
 [Watch the demo here!](https://drive.google.com/file/d/1RtfwRtwCutBlOyW3axaCPyapHUWt_1ZF/view?usp=sharing)

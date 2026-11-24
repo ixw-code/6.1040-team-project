@@ -6,7 +6,6 @@
 //   1. run `bun run generate` so it appears on `api` (web/src/api.ts),
 //   2. replace the function body with the real `api.<route>(...)` call,
 //   3. map the wire output into the shapes in types.ts here, so the screens don't change.
-import { useSession } from "../session.ts";
 import * as mock from "./mockData.ts";
 import type {
   Attempt, AvailabilityBlock, AvailabilityChange, Person, Preference, SwapOverview, SwapRequest, Task,
@@ -20,9 +19,7 @@ export async function getPeople(): Promise<Person[]> {
   // TODO(backend): HouseholdManaging._residents(household) + Registering._username for names.
   // Mark isMe by comparing with the user from /user/me (useSession in ../session.ts).
   await delay();
-  const username = useSession().me.value?.username;
-  // The signed-in user's real username replaces the mock "Alice".
-  return clone(mock.people).map((p) => (p.isMe && username ? { ...p, name: username } : p));
+  return clone(mock.people);
 }
 
 /** The signed-in resident's tasks for this week, for My Tasks. */
