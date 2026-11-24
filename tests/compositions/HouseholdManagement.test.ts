@@ -109,6 +109,25 @@ describe("HouseholdManagement HTTP", () => {
       .toMatchObject({ status: 401, body: { error: "UNAUTHORIZED" } });
   });
 
+  test("returns each resident's username with their user ID", async () => {
+    const { post, register, invoke } = setup();
+    const alice = await register();
+    const bob = await register();
+    const { body: { household } } = await post("/households/create", { name: "Home" }, alice.cookie);
+    expect(await post("/households/residents/add", { household, person: bob.person }, alice.cookie))
+      .toMatchObject({ status: 200 });
+
+    expect(await post("/households/residents", { household }, alice.cookie)).toMatchObject({
+      status: 200,
+      body: {
+        residents: expect.arrayContaining([
+          { person: alice.person, username: alice.username },
+          { person: bob.person, username: bob.username },
+        ]),
+      },
+    });
+  });
+
   test("guards category and household deletion against chores, tasks, and orphan availability", async () => {
     const { application, post, register, invoke } = setup();
     const owner = await register();

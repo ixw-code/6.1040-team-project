@@ -1,25 +1,34 @@
 // Every backend call the resident screens make goes through this file.
 //
-// The backend currently exposes only /user/* (see generated/wire.ts), so each function below is a
-// PLACEHOLDER that reads and writes the in-memory data in mockData.ts. Each one has a TODO(backend)
-// naming the concept action/query it should call. When an endpoint lands:
+// Many functions below are placeholders that read and write the in-memory data in mockData.ts.
+// Each one has a TODO(backend) naming the concept action/query it should call. When an endpoint lands:
 //   1. run `bun run generate` so it appears on `api` (web/src/api.ts),
 //   2. replace the function body with the real `api.<route>(...)` call,
 //   3. map the wire output into the shapes in types.ts here, so the screens don't change.
+// These changes are currently in-progress.
 import * as mock from "./mockData.ts";
 import type {
   Attempt, AvailabilityBlock, AvailabilityChange, Person, Preference, SwapOverview, SwapRequest, Task,
 } from "./types.ts";
+import { api } from "../api.ts";
+import { useSession } from "../session.ts";
+import { colorFor } from "./display.ts";
 
 const delay = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
 const clone = <T>(value: T): T => structuredClone(value);
 
-/** The household's residents, including the signed-in user (isMe). */
+/** The residents of the selected household, with the signed-in user marked. */
 export async function getPeople(): Promise<Person[]> {
-  // TODO(backend): HouseholdManaging._residents(household) + Registering._username for names.
-  // Mark isMe by comparing with the user from /user/me (useSession in ../session.ts).
-  await delay();
-  return clone(mock.people);
+  const { me, household } = useSession();
+  const result = await api.households.residents({ household: household.value });
+  if ("error" in result) throw new Error(result.error);
+
+  return result.residents.map(({ person, username }) => ({
+    id: person,
+    name: username ?? "Unknown",
+    color: colorFor(person),
+    isMe: person === me.value?.user,
+  }));
 }
 
 /** The signed-in resident's tasks for this week, for My Tasks. */

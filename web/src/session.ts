@@ -9,6 +9,7 @@ interface Me {
 const me = ref<Me | null>(null);
 const checked = ref(false);
 const error = ref<string | null>(null);
+const household = ref("");
 
 async function load() {
   const result = await api.user.me();
@@ -43,7 +44,8 @@ function sessionEnded() {
   me.value = null;
 }
 
+
 /** The signed-in person, and the functions that call `/auth/me` and `/auth/logout`, shared by every component and every way of signing in. */
 export function useSession() {
-  return { me, checked, error, load, enter, signOut, sessionEnded };
+  return { me, checked, error, household, load, enter, signOut, sessionEnded };
 }
