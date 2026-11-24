@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { onMounted, provide, ref, onErrorCaptured } from "vue";
-import { householdKey, localDate, post, type Catalog, type Home } from "./household.ts";
+import { householdKey, localDate, post, type Catalog, type Home } from "../household.ts";
 import HouseholdSettings from "./HouseholdSettings.vue";
-import { mondayOf } from "../../src/shared/assignmentDates.ts";
+import { mondayOf } from "../../../src/shared/assignmentDates.ts";
 import ChoreCatalog from "./ChoreCatalog.vue";
 import ManageHousehold from "./ManageHousehold.vue";
 import ReviewQueue from "./ReviewQueue.vue";
-import ResidentApp from "./resident/ResidentApp.vue";
-import { useNav } from "./resident/nav.ts";
+import ResidentApp from "../resident/ResidentApp.vue";
+import { useNav } from "../resident/nav.ts";
 
 const emit = defineEmits<{ changed: [] }>();
 const props = defineProps<{ home: Home; person: string }>();

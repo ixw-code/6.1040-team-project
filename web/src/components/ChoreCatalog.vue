@@ -2,9 +2,9 @@
 import { computed, ref } from "vue";
 import {
   assignmentDates, assignmentInWeek, localAssignmentTime, maxAssignmentOccurrences, mondayFirstWeekdays, mondayOf,
-} from "../../src/shared/assignmentDates.ts";
-import { api } from "./api.ts";
-import { checked, localDate, post, upload, useHousehold } from "./household.ts";
+} from "../../../src/shared/assignmentDates.ts";
+import { api } from "../api.ts";
+import { checked, localDate, post, upload, useHousehold } from "../household.ts";
 
 const emit = defineEmits<{ created: [week: string]; viewAssignments: [] }>();
 const { home, catalog, refresh } = useHousehold();
@@ -84,7 +84,8 @@ async function addTask() {
     end: localAssignmentTime(day, due.value).toISOString(),
   }));
   const repeatWeekly = frequency.value === "weekly";
-  const input = { household, chore: chore.value, windows, repeatWeekly };
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const input = { household, chore: chore.value, windows, repeatWeekly, timeZone };
   const payload = JSON.stringify(input);
   if (pendingBatch?.payload !== payload) pendingBatch = { payload, batchId: crypto.randomUUID() };
   const result = checked(await api.assignments.tasks["create-batch"]({ ...input, batchId: pendingBatch.batchId }));

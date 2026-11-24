@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import EvidencePhoto from "./EvidencePhoto.vue";
-import { evidenceUrl, post, useHousehold } from "./household.ts";
+import { evidenceUrl, post, useHousehold } from "../household.ts";
 
 type Entry = {
   submission: string; task: string; title: string; person: string; baseline: string; criteria: string;

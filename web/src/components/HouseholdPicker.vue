@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api } from "./api.ts";
-import { checked, type Home } from "./household.ts";
-import { useSession } from "./session.ts";
+import { api } from "../api.ts";
+import { checked, type Home } from "../household.ts";
+import { useSession } from "../session.ts";
 import HouseholdWorkspace from "./HouseholdWorkspace.vue";
 
 defineProps<{ person: string; username: string }>();

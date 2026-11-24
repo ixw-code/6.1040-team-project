@@ -1,6 +1,7 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
 import { compute, each, former, is, no, now, reaction, view, when, where, whether } from "@mit-sdg/sync-engine/language";
 import { concepts, computations } from "../concepts.ts";
+import { isTimeZone, isWeeklyAvailability } from "../shared/weeklyAvailability.ts";
 import { maxAssignmentOccurrences } from "../shared/assignmentDates.ts";
 
 const { HouseholdManaging, ChoreCataloguing, TaskScheduling, Sessioning } = concepts;
@@ -62,6 +63,12 @@ const PersonAvailability = former("availability for (person) in (household)", ({
   each(TaskScheduling._availability({ group: household, person }).is({ availability, interval })).form({ availability, interval }),
 );
 
+const PersonWeeklyAvailability = former(
+  "the recurring availability of (person) in (household)",
+  ({ household, person }, { days }) =>
+    where(TaskScheduling._weeklyAvailability({ group: household, person }).is({ days })).form({ weeklyAvailability: days }),
+);
+
 const ResidentWorkload = former("the workload of (person) in (household)", ({ household, person }, { workload }) =>
   where(TaskScheduling._workload({ group: household, person }).is({ workload })).form({ workload }),
 );
@@ -74,7 +81,7 @@ const HouseholdOverview = former(
         person,
         availability: PersonAvailability({ household, person }),
         preferences: HouseholdPreferences({ household, person }),
-      }).splicing(ResidentWorkload({ household, person })),
+      }).splicing(ResidentWorkload({ household, person }), PersonWeeklyAvailability({ household, person })),
 );
 
 const ChoreDetails = former(
@@ -195,6 +202,15 @@ const EditAvailability = route("availability/edit", {
   ),
 );
 
+const SetWeeklyAvailability = route("availability/weekly/set", { days: isWeeklyAvailability, timeZone: isTimeZone }, (
+  { session, household, person, days, timeZone, freed },
+) => receive({ session, household, days, timeZone }).then(Sessioning.use({ session }).responds({ subject: person })).then(
+  missingHousehold(household), denied(household, CanReadSchedule({ requester: person, household })),
+  where(residentExists(household, person))
+    .then(TaskScheduling.setWeeklyAvailability({ group: household, person, days, timeZone }).responds({ freed }))
+    .then(respond({ freed })).named("saved"),
+));
+
 const RemoveAvailability = route("availability/remove", { person: text, availability: text }, (
   { session, requester, household, person, availability, freed },
 ) => {
@@ -239,18 +255,19 @@ const CreateTaskBatch = route("tasks/create-batch", {
   batchId: value => typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(value),
   windows: value => Array.isArray(value) && value.length > 0 && value.length <= maxAssignmentOccurrences && value.every(interval),
   repeatWeekly: value => typeof value === "boolean",
-}, ({ session, requester, household, chore, batchId, windows, repeatWeekly, intervals, category, weight, tasks }) => {
+  timeZone: nullable(isTimeZone),
+}, ({ session, requester, household, chore, batchId, windows, repeatWeekly, timeZone, intervals, category, weight, tasks }) => {
   const allowed = CanManageSchedule({ requester, household });
   const valid = ValidHouseholdChore({ chore, household });
-  return receive({ session, household, chore, batchId, windows, repeatWeekly })
+  return receive({ session, household, chore, batchId, windows, repeatWeekly, timeZone })
     .then(Sessioning.use({ session }).responds({ subject: requester })).then(
       missingHousehold(household), denied(household, allowed),
       where(allowed, no(valid.is({}))).then(respond({ error: "NOT_FOUND" })).named("missingChore"),
       where(allowed, valid.is({ category, difficulty: weight }), compute(availabilityWindows, { windows }, intervals))
-        .then(TaskScheduling.addBatch({ group: household, item: chore, category, weight, intervals, batchId, repeatWeekly }).responds({ tasks }))
+        .then(TaskScheduling.addBatch({ group: household, item: chore, category, weight, intervals, batchId, repeatWeekly, timeZone }).responds({ tasks }))
         .then(respond({ tasks })).named("created"),
     );
-}, { repeatWeekly: false });
+}, { repeatWeekly: false, timeZone: null });
 
 function taskChange(path: string, field: "deadline" | "interval" | undefined) {
   return route(path, { task: text, ...(field === "deadline" ? { deadline: nullable(date) }
@@ -410,6 +427,15 @@ const GetAvailability = route("availability", { person: text }, ({ session, requ
   );
 });
 
+const GetWeeklyAvailability = route("availability/weekly", { person: text }, ({ session, requester, household, person, days }) => {
+  const allowed = CanReadHouseholdDetails({ requester, household, person });
+  return receive({ session, household, person }).then(Sessioning.use({ session }).responds({ subject: requester })).then(
+    missingHousehold(household), denied(household, allowed), missingResident(allowed, household, person),
+    where(allowed, residentExists(household, person), TaskScheduling._weeklyAvailability({ group: household, person }).is({ days }))
+      .then(respond({ days })).named("availability"),
+  );
+});
+
 const GetHouseholdOverview = route("overview", {}, ({ session, requester, household }) => {
   const allowed = CanManageSchedule({ requester, household });
   return receive({ session, household }).then(Sessioning.use({ session }).responds({ subject: requester })).then(
@@ -420,7 +446,7 @@ const GetHouseholdOverview = route("overview", {}, ({ session, requester, househ
 
 export const assignmentHttpErrors = {
   TASK_NOT_FOUND: "NOT_FOUND", AVAILABILITY_NOT_FOUND: "NOT_FOUND",
-  TASK_INTERVAL_INVALID: "INVALID_REQUEST", TASK_WEIGHT_INVALID: "INVALID_REQUEST",
+  WEEKLY_AVAILABILITY_INVALID: "INVALID_REQUEST", TASK_INTERVAL_INVALID: "INVALID_REQUEST", TASK_WEIGHT_INVALID: "INVALID_REQUEST",
   SCHEDULE_WINDOW_INVALID: "INVALID_REQUEST", PREFERENCES_INVALID: "INVALID_REQUEST",
   SCHEDULE_ENTRIES_INVALID: "INVALID_REQUEST", TASK_STATUS_CONFLICT: "CONFLICT",
   PERSON_NOT_AVAILABLE: "CONFLICT", RESIDENT_STILL_PRESENT: "CONFLICT",
@@ -429,8 +455,8 @@ export const assignmentHttpErrors = {
 export const composition = {
   CanManageSchedule, CanReadSchedule, CanEditAvailability, CanReadHouseholdDetails,
   ValidHouseholdChore, AssignmentIsModifiable, HouseholdPreferences,
-  PersonAvailability, ResidentWorkload, HouseholdOverview, ChoreDetails, ScheduleTaskDetails, HouseholdSchedule, PersonalTaskMatches, MyTasks,
-  ResidentRemoved, RetryResidentCleanup, AddAvailability, EditAvailability, RemoveAvailability, CreateTask, CreateTaskBatch, RemoveTask, DeleteAssignment,
+  PersonAvailability, PersonWeeklyAvailability, ResidentWorkload, HouseholdOverview, ChoreDetails, ScheduleTaskDetails, HouseholdSchedule, PersonalTaskMatches, MyTasks,
+  ResidentRemoved, RetryResidentCleanup, AddAvailability, EditAvailability, SetWeeklyAvailability, RemoveAvailability, CreateTask, CreateTaskBatch, RemoveTask, DeleteAssignment,
   UpdateDeadline, UpdateInterval, AutoSchedule, WeeklyAutoSchedule, Reset, SetSchedule,
-  GetSchedule, AssignmentList, GetAssignments, GetTask, GetMyTasks, GetTotal, GetAvailability, GetHouseholdOverview,
+  GetSchedule, AssignmentList, GetAssignments, GetTask, GetMyTasks, GetTotal, GetAvailability, GetWeeklyAvailability, GetHouseholdOverview,
 };

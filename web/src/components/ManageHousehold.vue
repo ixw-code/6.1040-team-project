@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api } from "./api.ts";
-import { checked, post, useHousehold, weekWindow, type AssignmentRow } from "./household.ts";
+import { api } from "../api.ts";
+import { checked, post, useHousehold, weekWindow, type AssignmentRow } from "../household.ts";
 
 const week = defineModel<string>("week", { required: true });
 const { home, catalog, refresh } = useHousehold();

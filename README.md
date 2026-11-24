@@ -64,13 +64,13 @@ bun run dev:frontend
 
 1. Register two accounts in separate browser profiles or a regular and a private window.
 2. With the first account, create a household. From **Manage**, add the second account by username. In the **Chore catalog** tab, save the household’s reusable chores with descriptions, effort, completion criteria, and baseline photos.
-3. With the second account, refresh households. In **Availability**, enter a block of time. In **Prefs**, rank the catalog chores from most to least preferred.
-4. In **Chore catalog → Create assignment**, select a chore and choose a weekday, start time and deadline. Pick a date in one week, or select **Repeat weekly** and pick the first and last dates of the range. Include times covered by the resident’s availability.
-5. Open **Manage** and choose an assignee in the assignment list. A weekly repeat appears as one assignment, and the chosen resident receives every open date through the end of the series. **Assign available residents** considers candidates available for every open date.
+3. With the second account, refresh households. In **Availability**, mark each weekday Available, Somewhat available, or Not available. In **Prefs**, rank the catalog chores from most to least preferred.
+4. In **Chore catalog → Create assignment**, select a chore and choose a weekday, start time and deadline. Pick a date in one week, or select **Repeat weekly** and pick the first and last dates of the range. Choose days that fit the resident’s weekly availability.
+5. Open **Manage** and choose an assignee in the assignment list. A weekly repeat appears as one assignment, and the chosen resident receives every open date through the end of the series. **Assign available residents** starts with people marked Available. Somewhat available is the fallback, and Not available is excluded. It checks the weekday for each open date.
 6. The resident opens a dated task in **My Tasks**, checks the baseline and submits a photo. The overseer opens **Review queue** to compare it against the saved baseline. Rejections require feedback. The resident can open the rejected attempt to read it and submit a new photo.
 7. Approval records the resident's submission time as the completion time and credits the task once. **Reviewed** shows prior decisions, and **Manage** shows each member's points.
 
-Residents rank each catalog chore once, regardless of how many tasks use it. The scheduler weighs that order with workload and task effort, and chooses randomly among equally suitable available residents. The overseer runs scheduling for the selected week. Alpha uses manual photo review and manual reassignment for trades.
+Residents rank each catalog chore once, regardless of how many tasks use it. The scheduler weighs that order with workload and task effort, and chooses randomly among equally suitable available residents. The overseer runs scheduling for the selected week. Existing time blocks continue to apply until someone saves weekly availability. Alpha uses manual photo review and manual reassignment for trades.
 
 Only the overseer can delete chores and assignments. Deleting a chore removes it from the catalog and preferences, and its saved details are available to existing tasks. Deleting a weekly assignment removes the whole series from the schedule. The review history retains decisions and credit already earned.
 

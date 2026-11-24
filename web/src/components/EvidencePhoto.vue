@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Photo } from "./review-preview.ts";
+import type { Photo } from "../review-preview.ts";
 
 defineProps<{ photo: Photo }>();
 </script>

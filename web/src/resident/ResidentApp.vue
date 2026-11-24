@@ -5,7 +5,6 @@ import { computed } from "vue";
 import TabBar from "./components/TabBar.vue";
 import { useNav } from "./nav.ts";
 import AttemptScreen from "./screens/AttemptScreen.vue";
-import AvailabilityFormScreen from "./screens/AvailabilityFormScreen.vue";
 import AvailabilityScreen from "./screens/AvailabilityScreen.vue";
 import CalendarScreen from "./screens/CalendarScreen.vue";
 import ImageViewerScreen from "./screens/ImageViewerScreen.vue";
@@ -31,7 +30,6 @@ const screenKey = computed(() => `${nav.tab.value}:${JSON.stringify(screen.value
       <PhotoPreviewScreen v-else-if="screen.name === 'photo'" :task-id="screen.taskId" :file="screen.file" />
       <AttemptScreen v-else-if="screen.name === 'attempt'" :task-id="screen.taskId" :attempt-id="screen.attemptId" />
       <ImageViewerScreen v-else-if="screen.name === 'image'" :url="screen.url" :label="screen.label" />
-      <AvailabilityFormScreen v-else-if="screen.name === 'availabilityForm'" :removing="screen.removing" />
     </div>
     <TabBar v-if="nav.isTabScreen.value" />
   </div>

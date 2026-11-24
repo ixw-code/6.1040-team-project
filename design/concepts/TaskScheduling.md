@@ -44,6 +44,9 @@ Source is AUTO or MANUAL
 Status is PENDING or OVERDUE or COMPLETED or COMPLETED_LATE
   Whether atask has been completed or not, in regards to its deadline.
 
+opaque WeekAvailability
+  A level for each weekday. Levels are available, somewhat available, and not available.
+
 opaque IntervalSet
   A list of time intervals.
 
@@ -73,6 +76,13 @@ a set of Availabilities with
   a person Person
   an interval Interval
 
+a set of WeeklyAvailabilities with
+  a group Group
+  a person Person
+  a days WeekAvailability
+  a timeZone String
+  unique group and person
+
 a set of Tasks with 
   a group Group
   an item Item
@@ -85,6 +95,7 @@ a set of Tasks with
   an optional completedBy Person
   an optional completedAt DateTime
   an optional archived Flag
+  an optional timeZone String
 
 Rule: all stored timestamps are valid DateTime values
 Rule: every interval must have start before end
@@ -94,8 +105,10 @@ Rule: a task's weight is a positive float between 1-10, inclusive
 Rule: a task has an assignee exactly when it has a source
 Rule: a task with an assignee must have a scheduled interval
 Rule: a task must have either a deadline or a scheduled interval
-Rule: a person is 'available' for a task when their availability intervals in the group completely cover the task's scheduled interval 
-Rule: assigned standalone pending tasks require full availability coverage
+Rule: a saved weekly pattern determines availability on the day a task starts in its scheduling time zone
+Rule: for tasks without a stored zone, use the resident's saved zone
+Rule: if a resident has no weekly pattern, retain the existing interval coverage rule
+Rule: assigned standalone pending tasks require an available or somewhat available day, or legacy interval coverage
 Rule: weekly assignments keep the same assignee across their open occurrences until an overseer makes another assignment decision or the assignee leaves
 Rule: completed occurrences retain their recorded completion when open occurrences change assignee
 
@@ -127,11 +140,11 @@ add(group: Group, item: Item, category?: Category, weight: Number, deadline?: Da
       no completedBy, and no completedAt
     returns task
 
-addBatch(group: Group, item: Item, category?: Category, weight: Number, intervals: IntervalSet, batchId: String, repeatWeekly?: Flag): returns (tasks: TaskSet)
+addBatch(group: Group, item: Item, category?: Category, weight: Number, intervals: IntervalSet, batchId: String, repeatWeekly?: Flag, timeZone?: String): returns (tasks: TaskSet)
   where weight is nonfinite or outside [1, 10]
   then
     refuses TASK_WEIGHT_INVALID "Task weight must be between 1 and 10."
-  where the batch has fewer than 1 or more than 104 intervals, or any interval has invalid start or end times
+  where the batch has fewer than 1 or more than 104 intervals, any interval has invalid start or end times, or the supplied zone is invalid
   then
     refuses TASK_INTERVAL_INVALID "Provide between 1 and 104 valid task intervals."
   where the batch is valid and the group has already used the request ID
@@ -141,7 +154,7 @@ addBatch(group: Group, item: Item, category?: Category, weight: Number, interval
   where the batch is valid and the request ID is new for the group
   then
     atomically create one unassigned task per interval with the same item, category and weight
-    set each deadline to the end of its interval
+    set each deadline to the end of its interval and record the zone when supplied
     save the task IDs and whether they form one weekly assignment with the request ID
     returns tasks
 
@@ -202,6 +215,16 @@ updateInterval(task: Task, interval?: Interval): returns (task: Task)
     for standalone tasks, clear assignee and source if the current assignee is unavailable for the new interval
     returns task
 
+setWeeklyAvailability(group: Group, person: Person, days: WeekAvailability, timeZone: String): returns (freed: TaskSet)
+  where a weekday has no valid level or the time zone is invalid
+  then
+    refuses WEEKLY_AVAILABILITY_INVALID "Provide an availability level for every weekday and a valid time zone."
+  where the weekly pattern and time zone are valid
+  then
+    save the pattern and zone for this person
+    clear their open standalone assignments where they selected not available
+    returns freed
+
 addAvailability(group: Group, person: Person, start: DateTime, end: DateTime): returns (availability: Availability)
   where start or end is invalid or start is not before end
   then
@@ -234,7 +257,7 @@ removeAvailability(availability: Availability): returns (freed: TaskSet)
 removePerson(group: Group, person: Person): returns (freed: TaskSet)
   where true
   then
-    remove all availabilities for person in group
+    remove weekly availability and legacy intervals for person in group
     clear assignee and source from tasks not already completed and previously assigned to person in group
     if person has no availability or incomplete assignments in group, no changes are made
     returns freed
@@ -252,7 +275,8 @@ autoSchedule(group: Group, from: DateTime, until: DateTime, people: PersonSet, p
     if onlyUnassigned is false, clear automatic assignments on all open occurrences of any considered assignment without manual assignees
     process assignments in order of their first open occurrence in the window
     skip assignments with any remaining assignee
-    select an eligible person whose availability covers every open occurrence
+    group eligible people by their lowest availability level across the open occurrences
+    consider the available group first and then the somewhat available group if needed
     choose the lowest cost based on workload, chore weight, and the resident's chore ranking
     use a multiplier of 0.5 for first to 1.5 for last, or 1 for unranked chores
     use legacy category preferences only for residents who have no chore ranking
@@ -274,7 +298,7 @@ setSchedule(group: Group, entries: ScheduleEntrySet): returns (entries: Schedule
   where entries specify different assignees for the same task or weekly assignment, including assignment versus unassignment
   then
     refuses SCHEDULE_ENTRIES_INVALID "A task cannot have conflicting assignments in one batch."
-  where a standalone task has an assignee who is not available for it
+  where a standalone task has an ineligible assignee or a requested weekly assignee marked any open occurrence's day not available
   then
     refuses PERSON_NOT_AVAILABLE "An assignee is not available for this task."
   where the batch passes all preceding checks
@@ -333,7 +357,7 @@ uncomplete(task: Task): returns (task: Task, lastCompletedBy: Person, lastComple
 _assignments(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, weekly: Flag, occurrences: Number, remaining: Number, mixed: Flag, assignee: Person, startsAt: DateTime, endsAt: DateTime)
   Returns one row per visible standalone or weekly assignment with at least one occurrence in the requested window. Weekly rows summarize the whole series.
 
-_get(task: Task) : optional (group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime, archived?: Flag)
+_get(task: Task) : optional (group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime, archived?: Flag, timeZone?: String)
   Returns task details if task exists, or no rows otherwise.
 
 _activeTask(task: Task) : optional (group: Group)
@@ -360,8 +384,11 @@ _completedInInterval(group: Group, from: DateTime, until: DateTime) : many (task
 _availability(group: Group, person: Person) : many (availability: Availability, interval: Interval)
   Returns the person's availabilities, ordered by earliest start then availability identity. Returns no rows when none match.
 
+_weeklyAvailability(group: Group, person: Person) : one (days: WeekAvailability)
+  Returns this person's recurring weekday availability, or null when no weekly pattern is saved.
+
 _hasAvailability(group: Group) : one (available: Flag)
-  Returns whether any availability remains in the group, or false if the group has none.
+  Returns whether any weekly day is eligible or any unsuperseded legacy availability remains in the group, or false if the group has none.
 
 _workload(group: Group, person: Person) : one (workload: Number)
   Returns the calculated total assigned workload of a person in the group, or zero when no tasks are assigned.

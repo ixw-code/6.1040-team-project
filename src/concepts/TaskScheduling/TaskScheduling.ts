@@ -1,6 +1,9 @@
 import { MongoServerError, type Db } from "mongodb";
-import { maxAssignmentOccurrences } from "../../shared/assignmentDates.ts";
+import { maxAssignmentOccurrences, type Weekday } from "../../shared/assignmentDates.ts";
 
+import { isTimeZone, isWeeklyAvailability, type AvailabilityLevel, type WeekAvailability } from "../../shared/weeklyAvailability.ts";
+
+export class WeeklyAvailabilityInvalid extends Error {}
 export class TaskNotFound extends Error {}
 export class TaskWeightInvalid extends Error {}
 export class TaskIntervalInvalid extends Error {}
@@ -31,13 +34,22 @@ type TaskDefinition = {
   weight: number;
   deadline?: Date;
   interval?: Interval;
+  timeZone?: string;
 };
 type Task = TaskRef & TaskDefinition & Partial<Completion> & { assignee?: string; source?: Source; archived?: boolean };
-type TaskRow = Omit<Task, "interval" | "archived"> & { start?: Date; end?: Date };
+type TaskRow = Omit<Task, "interval" | "archived" | "timeZone"> & { start?: Date; end?: Date };
 type Availability = AvailabilityRef & PersonRef & { interval: Interval };
+type WeeklyAvailability = { days: WeekAvailability; timeZone: string };
 type TaskBatch = { batchId: string; tasks: TaskRef[]; repeatWeekly?: boolean };
 type Assignment = { tasks: Task[]; batch?: TaskBatch };
-type GroupState = { _id: string; version: number; tasks: Task[]; availabilities: Availability[]; taskBatches?: TaskBatch[] };
+type GroupState = {
+  _id: string;
+  version: number;
+  tasks: Task[];
+  availabilities: Availability[];
+  weeklyAvailability?: (PersonRef & WeeklyAvailability)[];
+  taskBatches?: TaskBatch[];
+};
 
 const taskMissing = "This task doesn't exist in the schedule.";
 const availabilityMissing = "There is no such availability.";
@@ -77,7 +89,7 @@ function isCompleted(task: Task): task is Task & Completion {
   return task.completedAt !== undefined && task.completedBy !== undefined;
 }
 
-function availableFor(state: GroupState, person: string, interval: Interval): boolean {
+function coversInterval(state: GroupState, person: string, interval: Interval): boolean {
   const windows = state.availabilities.filter((entry) => entry.person === person)
     .sort((a, b) => a.interval.start.getTime() - b.interval.start.getTime());
   let coveredUntil = interval.start;
@@ -87,6 +99,30 @@ function availableFor(state: GroupState, person: string, interval: Interval): bo
     if (coveredUntil >= interval.end) return true;
   }
   return false;
+}
+
+const availabilityRank: Record<AvailabilityLevel, number> = {
+  AVAILABLE: 2, SOMEWHAT_AVAILABLE: 1, NOT_AVAILABLE: 0,
+};
+
+const weekdayFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function taskWeekday(start: Date, timeZone: string): Weekday {
+  let formatter = weekdayFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long" });
+    weekdayFormatters.set(timeZone, formatter);
+  }
+  return formatter.format(start) as Weekday;
+}
+
+function availabilityFor(state: GroupState, person: string, task: Task): number {
+  if (!task.interval) return 0;
+  const weekly = state.weeklyAvailability?.find(entry => entry.person === person);
+  if (weekly) {
+    return availabilityRank[weekly.days[taskWeekday(task.interval.start, task.timeZone ?? weekly.timeZone)]];
+  }
+  return coversInterval(state, person, task.interval) ? availabilityRank.AVAILABLE : 0;
 }
 
 function clearAssignments(tasks: Task[], matches: (task: Task) => boolean): TaskRef[] {
@@ -175,7 +211,7 @@ function canReset(open: Task[]): boolean {
 function clearUnavailable(state: GroupState, person: string): TaskRef[] {
   const recurring = recurringAssignments(state);
   return clearAssignments(state.tasks, task =>
-    task.assignee === person && !recurring.has(task) && !availableFor(state, person, task.interval!));
+    task.assignee === person && !recurring.has(task) && availabilityFor(state, person, task) === 0);
 }
 
 function completionOrder(a: Task & Completion, b: Task & Completion): number {
@@ -186,7 +222,7 @@ function inWindow(value: Date | undefined, { from, until }: Window): boolean {
   return value !== undefined && value >= from && value < until;
 }
 
-function taskRow({ interval, archived: _archived, ...task }: Task): TaskRow {
+function taskRow({ interval, archived: _archived, timeZone: _timeZone, ...task }: Task): TaskRow {
   return interval ? { ...task, start: interval.start, end: interval.end } : task;
 }
 
@@ -237,7 +273,7 @@ export class TaskSchedulingConcept {
     return state?.tasks ?? [];
   }
 
-  async add({ group, item, category, weight, deadline, interval }: GroupRef & TaskDefinition): Promise<TaskRef> {
+  async add({ group, item, category, weight, deadline, interval }: GroupRef & Omit<TaskDefinition, "timeZone">): Promise<TaskRef> {
     requireWeight(weight);
     if (!validTiming(deadline, interval)) {
       throw new TaskIntervalInvalid("Provide a deadline or a valid interval that ends by the deadline when both are given.");
@@ -252,11 +288,12 @@ export class TaskSchedulingConcept {
     }, true);
   }
 
-  async addBatch({ group, item, category, weight, intervals, batchId, repeatWeekly = false }: GroupRef
+  async addBatch({ group, item, category, weight, intervals, batchId, repeatWeekly = false, timeZone }: GroupRef
     & Pick<TaskDefinition, "item" | "category" | "weight"> & {
       intervals: Interval[];
       batchId: string;
       repeatWeekly?: boolean;
+      timeZone?: string | null;
     }): Promise<{ tasks: TaskRef[] }> {
     requireWeight(weight);
     if (!intervals.length || intervals.length > maxAssignmentOccurrences
@@ -264,9 +301,12 @@ export class TaskSchedulingConcept {
       throw new TaskIntervalInvalid(`Provide between 1 and ${maxAssignmentOccurrences} valid task intervals.`);
     }
 
+    if (timeZone != null && !isTimeZone(timeZone)) throw new TaskIntervalInvalid("Provide a valid time zone for the task.");
+
     const entries = intervals.map(interval => ({
       task: crypto.randomUUID(), item, weight, deadline: interval.end, interval,
       ...(category !== undefined && { category }),
+      ...(timeZone != null && { timeZone }),
     }));
     const tasks = entries.map(({ task }) => ({ task }));
     return this.#update(group, state => {
@@ -323,10 +363,27 @@ export class TaskSchedulingConcept {
       } else {
         entry.interval = interval;
         if (batch) batch.repeatWeekly = true;
-        else if (entry.assignee !== undefined && !availableFor(state, entry.assignee, interval)) clearAssignment(entry);
+        else if (entry.assignee !== undefined && availabilityFor(state, entry.assignee, entry) === 0) clearAssignment(entry);
       }
       return { task };
     });
+  }
+
+  async setWeeklyAvailability({ group, person, days, timeZone }: GroupRef & PersonRef & WeeklyAvailability): Promise<{ freed: TaskRef[] }> {
+    if (!isWeeklyAvailability(days) || !isTimeZone(timeZone)) {
+      throw new WeeklyAvailabilityInvalid("Provide an availability level for every weekday and a valid time zone.");
+    }
+    return this.#update(group, state => {
+      const weekly = state.weeklyAvailability ??= [];
+      const current = weekly.find(entry => entry.person === person);
+      if (current) {
+        current.days = { ...days };
+        current.timeZone = timeZone;
+      } else {
+        weekly.push({ person, days: { ...days }, timeZone });
+      }
+      return { freed: clearUnavailable(state, person) };
+    }, true);
   }
 
   async addAvailability({ group, person, start, end }: GroupRef & PersonRef & Interval): Promise<AvailabilityRef> {
@@ -347,7 +404,7 @@ export class TaskSchedulingConcept {
     return this.#update(group, state => {
       for (const interval of windows) {
         if (adding) {
-          if (!availableFor(state, person, interval)) {
+          if (!coversInterval(state, person, interval)) {
             state.availabilities.push({ availability: crypto.randomUUID(), person, interval });
           }
           continue;
@@ -382,6 +439,7 @@ export class TaskSchedulingConcept {
   async removePerson({ group, person }: GroupRef & PersonRef): Promise<{ freed: TaskRef[] }> {
     return this.#update(group, (state) => {
       state.availabilities = state.availabilities.filter((entry) => entry.person !== person);
+      if (state.weeklyAvailability) state.weeklyAvailability = state.weeklyAvailability.filter(entry => entry.person !== person);
       return { freed: clearAssignments(state.tasks, (task) => task.assignee === person) };
     });
   }
@@ -401,8 +459,12 @@ export class TaskSchedulingConcept {
           if (selected.has(occurrence) && selected.get(occurrence) !== entry.assignee) {
             throw new ScheduleEntriesInvalid("A task cannot have conflicting assignments in one batch.");
           }
-          if (!series && entry.assignee !== undefined && !availableFor(state, entry.assignee, occurrence.interval)) {
-            throw new PersonNotAvailable("An assignee is not available for this task.");
+          if (entry.assignee !== undefined) {
+            const assignee = entry.assignee;
+            const hasWeeklyAvailability = state.weeklyAvailability?.some(entry => entry.person === assignee);
+            if ((!series || hasWeeklyAvailability) && availabilityFor(state, assignee, occurrence) === 0) {
+              throw new PersonNotAvailable("An assignee is not available for this task.");
+            }
           }
           selected.set(occurrence, entry.assignee);
         }
@@ -464,16 +526,19 @@ export class TaskSchedulingConcept {
       const unassigned: TaskRef[] = [];
       for (const { task, open } of selected) {
         if (open.some(occurrence => occurrence.assignee !== undefined)) continue;
+        let bestAvailability = 0;
         let lowestCost = Infinity;
         let tied: string[] = [];
         for (const [person, levels] of candidates) {
-          if (!open.every(occurrence => occurrence.interval && availableFor(state, person, occurrence.interval))) continue;
+          const availability = Math.min(...open.map(occurrence => availabilityFor(state, person, occurrence)));
+          if (availability === 0 || availability < bestAvailability) continue;
           const ranking = choreCosts.get(person);
           const multiplier = ranking
             ? ranking.get(task.item) ?? 1
             : costMultiplier[task.category ? levels.get(task.category) ?? "NEUTRAL" : "NEUTRAL"];
           const cost = (workloads.get(person) ?? 0) + task.weight * multiplier;
-          if (cost < lowestCost) {
+          if (availability > bestAvailability || cost < lowestCost) {
+            bestAvailability = availability;
             lowestCost = cost;
             tied = [person];
           } else if (cost === lowestCost) tied.push(person);
@@ -533,7 +598,7 @@ export class TaskSchedulingConcept {
             entry.source = other.source;
           }
         }
-      } else if (entry.assignee !== undefined && !availableFor(state, entry.assignee, entry.interval!)) {
+      } else if (entry.assignee !== undefined && availabilityFor(state, entry.assignee, entry) === 0) {
         clearAssignment(entry);
       }
       return { task, lastCompletedBy, lastCompletedAt };
@@ -634,11 +699,19 @@ export class TaskSchedulingConcept {
       .map(({ availability, interval }) => ({ availability, interval }));
   }
 
+  async _weeklyAvailability({ group, person }: GroupRef & PersonRef): Promise<{ days: WeekAvailability | null }> {
+    const state = await this.#groups().findOne({ _id: group }, { projection: { weeklyAvailability: 1 } });
+    return { days: state?.weeklyAvailability?.find(entry => entry.person === person)?.days ?? null };
+  }
+
   async _hasAvailability({ group }: GroupRef): Promise<{ available: boolean }> {
-    const found = await this.#groups().findOne({ _id: group, "availabilities.0": { $exists: true } }, {
-      projection: { _id: 1 },
-    });
-    return { available: found !== null };
+    const state = await this.#groups().findOne({ _id: group }, { projection: { availabilities: 1, weeklyAvailability: 1 } });
+    const weekly = state?.weeklyAvailability ?? [];
+    const configured = new Set(weekly.map(entry => entry.person));
+    return {
+      available: weekly.some(entry => Object.values(entry.days).some(level => level !== "NOT_AVAILABLE"))
+        || (state?.availabilities.some(entry => !configured.has(entry.person)) ?? false),
+    };
   }
 
   async _workload({ group, person }: GroupRef & PersonRef): Promise<{ workload: number }> {

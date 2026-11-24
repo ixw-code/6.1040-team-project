@@ -1,6 +1,6 @@
 import { api } from "../api.ts";
 import { baselineUrl, checked, evidenceUrl, post, upload, useHousehold, type ScheduleRow } from "../household.ts";
-import type { Attempt, AvailabilityBlock, Person, Task } from "./types.ts";
+import type { Attempt, Person, Task } from "./types.ts";
 
 type AttemptRow = {
   submission: string; status: "PENDING" | "APPROVED" | "REJECTED";
@@ -49,13 +49,9 @@ export function useResidentApi() {
     const result = checked(await api.assignments.mine({ household, mode: "all", from: "0001-01-01T00:00:00Z", until: "9999-12-31T23:59:59Z" }));
     return Promise.all(result.tasks.map(mapTask));
   }
-  async function getAvailability(): Promise<AvailabilityBlock[]> {
-    const { availability } = checked(await api.assignments.availability({ household, person }));
-    return availability.map(a => ({ id: a.availability, personId: person, start: a.interval.start, end: a.interval.end }));
-  }
   async function submitPhoto(task: string, file: File) {
     const photo = await upload(file);
     await post("completion/submit", { task, photo });
   }
-  return { getPeople, getTask, getMyTasks, getSchedule, getAvailability, submitPhoto };
+  return { getPeople, getTask, getMyTasks, getSchedule, submitPhoto };
 }

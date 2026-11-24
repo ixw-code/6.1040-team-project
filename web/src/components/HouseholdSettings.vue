@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { api } from "./api.ts";
-import { checked, useHousehold } from "./household.ts";
+import { api } from "../api.ts";
+import { mondayFirstWeekdays } from "../../../src/shared/assignmentDates.ts";
+import {
+  availabilityLabels, availabilityLevels, type AvailabilityLevel, type WeekAvailability,
+} from "../../../src/shared/weeklyAvailability.ts";
+import { checked, useHousehold } from "../household.ts";
 
 const emit = defineEmits<{ changed: [] }>();
 const { home, catalog, person, refresh } = useHousehold();
@@ -9,8 +13,16 @@ const household = home.household;
 const manager = home.overseer === person;
 const name = ref(home.name), target = ref("");
 const error = ref(""), message = ref(""), busy = ref(false);
-type ResidentOverview = { person: string; workload: number; availability: { interval: { start: string; end: string } }[] };
+type ResidentOverview = {
+  person: string;
+  workload: number;
+  weeklyAvailability: WeekAvailability | null;
+  availability: { interval: { start: string; end: string } }[];
+};
 const overview = ref<ResidentOverview[]>([]);
+function daysWith(weekly: WeekAvailability, level: AvailabilityLevel) {
+  return mondayFirstWeekdays.filter(({ name }) => weekly[name] === level).map(({ name }) => name).join(", ") || "None";
+}
 const username = (id: string) => catalog.value.people.find(p => p.person === id)?.username ?? id;
 onMounted(async () => {
   if (manager) overview.value = checked(await api.assignments.overview({ household })).residents;
@@ -58,8 +70,12 @@ function removeHome() {
       <h3>Availability and workload</h3>
       <ul><li v-for="row in overview" :key="row.person" class="schedule-row">
         <div><strong>{{ username(row.person) }}</strong> · Assigned effort {{ row.workload }}
-          <p v-if="!row.availability.length">No availability saved.</p>
-          <p v-for="a in row.availability" :key="a.interval.start + a.interval.end">{{ new Date(a.interval.start).toLocaleString() }} – {{ new Date(a.interval.end).toLocaleString() }}</p>
+          <ul v-if="row.weeklyAvailability">
+            <li v-for="level in availabilityLevels" :key="level">
+              <strong>{{ availabilityLabels[level] }}</strong> · {{ daysWith(row.weeklyAvailability, level) }}
+            </li>
+          </ul>
+          <p v-else>{{ row.availability.length ? 'Using saved time blocks until weekly availability is set.' : 'No availability saved.' }}</p>
         </div></li></ul>
       <button class="button button-secondary" @click="removeHome">Remove unused household</button>
     </fieldset>

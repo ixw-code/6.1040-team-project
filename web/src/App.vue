@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
-import SignIn from "./SignIn.vue";
-import PasswordForm from "./PasswordForm.vue";
-import HouseholdPicker from "./HouseholdPicker.vue";
+import SignIn from "./components/SignIn.vue";
+import PasswordForm from "./components/PasswordForm.vue";
+import HouseholdPicker from "./components/HouseholdPicker.vue";
 import { useSession } from "./session.ts";
 const { me, checked, load } = useSession();
 onMounted(load);

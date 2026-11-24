@@ -1,6 +1,7 @@
 export const maxAssignmentOccurrences = 104;
 
-const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+export const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+export type Weekday = typeof weekdays[number];
 export const mondayFirstWeekdays = [1, 2, 3, 4, 5, 6, 0].map(day => ({ day, name: weekdays[day] }));
 
 function calendarDay(value: string): Date {
