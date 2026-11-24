@@ -3,6 +3,12 @@
 ```types
 concrete Person
   A person of the app (TBA from Registering) 
+  
+concrete Household
+  A group whose residents share chores.
+
+concrete TaskOccurrence
+  A specific dated task that can earn contribution credit.
 
 concrete PhotoReference
   A reference to a submitted or baseline photo.
@@ -35,5 +41,5 @@ instantiate PhotoChecking with
   Person is Person
   Subject is TaskScheduling.Task
   Photo is PhotoReference
-  Reviewer is ReviewerIdentity
+  Reviewer is ReviewerIdentity  
 ```
