@@ -1,9 +1,6 @@
 # Shift Happens Application Types
 
 ```types
-concrete Person
-  A person of the app (TBA from Registering) 
-  
 concrete Household
   A group whose residents share chores.
 
@@ -19,7 +16,7 @@ concrete ReviewerIdentity
 
 ```instances
 instantiate HouseholdManaging 
-  Person is Person
+  Person is Registering.User
 
 instantiate ChoreCataloguing with
   Group is HouseholdManaging.Household
@@ -27,19 +24,27 @@ instantiate ChoreCataloguing with
   Photo is PhotoReference
 
 instantiate TaskScheduling with
-  Person is Person
+  Person is Registering.User
   Group is HouseholdManaging.Household
   Category is HouseholdManaging.Category
   Item is ChoreCataloguing.Chore
 
 instantiate Ranking with
   Group is HouseholdManaging.Household
-  Person is Person
+  Person is Registering.User
   Contribution is TaskScheduling.Task
 
 instantiate PhotoChecking with
-  Person is Person
+  Person is Registering.User
   Subject is TaskScheduling.Task
   Photo is PhotoReference
-  Reviewer is ReviewerIdentity  
+  Reviewer is ReviewerIdentity
+
+instantiate Registering
+
+instantiate Authenticating with
+  User is Registering.User
+
+instantiate Sessioning with
+  Subject is Registering.User
 ```
