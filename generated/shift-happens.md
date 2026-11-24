@@ -8,6 +8,27 @@ _specifications and composition source, then regenerate this file._
 
 ## Concepts
 
+### Authenticating
+
+Defined in [Authenticating](../design/concepts/Authenticating.md), line 1.
+
+#### Actions
+
+- `set(user: User, password: String) : returns (user: User)`
+  - Refuses `INVALID_PASSWORD`: A password must have 8 to 128 characters.
+  - Refuses `PASSWORD_SET`: This account already has a password.
+- `authenticate(user: User, password: String) : returns (user: User)`
+  - Refuses `INVALID_CREDENTIALS`: The username or password is incorrect.
+
+#### Queries
+
+- `_acceptable(password: String) : one (acceptable: Flag)`
+
+#### Instances
+
+- `Authenticating` — instance of `Authenticating` — [Shift Happens Application Types](../design/types.md), line 34.
+  - `User` is `Registering.User` — [Shift Happens Application Types](../design/types.md), line 35.
+
 ### PhotoChecking
 
 Defined in [PhotoChecking](../design/concepts/PhotoChecking.md), line 1.
