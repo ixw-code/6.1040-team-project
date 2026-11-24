@@ -1,6 +1,8 @@
 import type { assembleApplication } from "../assembly.ts";
+import { allowsAppOrigin, signedInPerson } from "../http.ts";
+import { photoResponse, type PhotoStore } from "./Photos.ts";
 
-type CompletionConcepts = Pick<ReturnType<typeof assembleApplication>["concepts"], "PhotoChecking" | "Ranking">;
+type CompletionConcepts = Pick<ReturnType<typeof assembleApplication>["concepts"], "PhotoChecking" | "Ranking" | "Sessioning">;
 type HouseholdRole = "RESIDENT" | "OVERSEER";
 
 export type CompletionTask = {
@@ -24,9 +26,8 @@ export type TaskCompletion = {
   reviewedAt: Date;
 };
 
-// Connect the team's session, role, and task operations here when they are available.
+// Connect the team's role and task operations here when they are available.
 export interface CompletionHooks {
-  sessionPerson(session: string): string | undefined | Promise<string | undefined>;
   task(task: string): CompletionTask | undefined | Promise<CompletionTask | undefined>;
   role(household: string, person: string): HouseholdRole | undefined | Promise<HouseholdRole | undefined>;
   recordCompletion(completion: TaskCompletion): Promise<void>;
@@ -34,12 +35,15 @@ export interface CompletionHooks {
 
 const prefix = "/api/completion/";
 const paths = new Set(["submit", "get", "review", "review-queue"].map((name) => prefix + name));
+const submissionPhotoPath = /^\/api\/completion\/submissions\/([\da-f-]{36})\/photo$/;
 const errorCodes = {
   400: "INVALID_REQUEST",
   401: "UNAUTHORIZED",
+  403: "FORBIDDEN",
   404: "NOT_FOUND",
   409: "CONFLICT",
   500: "INTERNAL_ERROR",
+  503: "UNAVAILABLE",
 };
 
 function json(body: object, status = 200) {
@@ -70,32 +74,35 @@ function nonblank(value: unknown, maxLength = 256): value is string {
 function parseInput(operation: string, input: unknown) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return;
   const body = input as Record<string, unknown>;
-  const only = (...fields: string[]) => Object.keys(body).every((key) => key === "session" || fields.includes(key));
-  const { session = "", task, photo, household, submission, decision, feedback = "" } = body;
-  if (typeof session !== "string" || session.length > 256) return;
+  const only = (...fields: string[]) => Object.keys(body).every((key) => fields.includes(key));
+  const { task, photo, household, submission, decision, feedback = "" } = body;
 
   switch (operation) {
     case "submit":
-      if (only("task", "photo") && nonblank(task) && nonblank(photo, 2048)) {
-        return { operation, session, task, photo };
+      if (only("task", "photo") && nonblank(task) && nonblank(photo)) {
+        return { operation, task, photo };
       }
       return;
     case "get":
-      if (only("task") && nonblank(task)) return { operation, session, task };
+      if (only("task") && nonblank(task)) return { operation, task };
       return;
     case "review-queue":
-      if (only("household") && nonblank(household)) return { operation, session, household };
+      if (only("household") && nonblank(household)) return { operation, household };
       return;
     case "review":
       if (only("submission", "decision", "feedback") && nonblank(submission) &&
           (decision === "APPROVE" || decision === "REJECT") &&
           typeof feedback === "string" && feedback.length <= 2000) {
-        return { operation, session, submission, decision, feedback };
+        return { operation, submission, decision, feedback };
       }
   }
 }
 
-export function createCompletionHandler({ PhotoChecking, Ranking }: CompletionConcepts, hooks?: CompletionHooks) {
+export function createCompletionHandler(
+  { PhotoChecking, Ranking, Sessioning }: CompletionConcepts,
+  photos: PhotoStore,
+  hooks?: CompletionHooks,
+) {
   async function readCompletion(task: CompletionTask, person: string, role: HouseholdRole) {
     const attempts = await PhotoChecking._history({ subject: task.task });
     const latest = attempts[0]?.submission;
@@ -140,16 +147,31 @@ export function createCompletionHandler({ PhotoChecking, Ranking }: CompletionCo
 
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
-    if (!paths.has(path)) return failure(404);
-    const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
-    if (request.method !== "POST" || contentType !== "application/json") return failure(400);
-    const input = parseInput(path.slice(prefix.length), await request.json().catch(() => undefined));
-    if (!input) return failure(400);
-    if (!hooks || !input.session) return failure(401);
+    const attachment = submissionPhotoPath.exec(path)?.[1];
+    if (!attachment && !paths.has(path)) return failure(404);
+    if (!allowsAppOrigin(request)) return failure(403);
+    if (request.method !== (attachment ? "GET" : "POST")) return failure(400);
 
     try {
-      const person = await hooks.sessionPerson(input.session);
+      const person = await signedInPerson(request, Sessioning);
       if (!person) return failure(401);
+      if (!hooks) return failure(503);
+
+      if (attachment) {
+        const [details] = await PhotoChecking._submission({ submission: attachment });
+        const task = details && await hooks.task(details.subject);
+        if (!task) return failure(404);
+        const role = await hooks.role(task.household, person);
+        if (role !== "OVERSEER" && (role !== "RESIDENT" || details.person !== person)) return failure(404);
+        // Resolve the file from the authorized submission, including the original uploader.
+        const stored = await photos.read(details.photo, details.person);
+        return stored ? photoResponse(stored) : failure(404);
+      }
+
+      const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+      if (contentType !== "application/json") return failure(400);
+      const input = parseInput(path.slice(prefix.length), await request.json().catch(() => undefined));
+      if (!input) return failure(400);
 
       switch (input.operation) {
         case "submit": {
@@ -157,6 +179,7 @@ export function createCompletionHandler({ PhotoChecking, Ranking }: CompletionCo
           if (!task?.active || task.assignee !== person || await hooks.role(task.household, person) !== "RESIDENT") {
             return failure(404);
           }
+          if (!await photos.owns(input.photo, person)) return failure(404);
           const result = await PhotoChecking.submit({
             subject: task.task, person, photo: input.photo, criteria: task.criteria, baseline: task.baseline, method: "MANUAL",
           });

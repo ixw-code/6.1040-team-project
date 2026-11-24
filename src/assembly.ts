@@ -1,7 +1,7 @@
 import { assemble } from "@mit-sdg/sync-engine/assembly";
 import { applicationConceptSet } from "./concepts.ts";
-import { PhotoCheckingConcept } from "./concepts/PhotoChecking.ts";
-import { RankingConcept } from "./concepts/Ranking.ts";
+import { PhotoCheckingConcept } from "./concepts/PhotoChecking/PhotoChecking.ts";
+import { RankingConcept } from "./concepts/Ranking/Ranking.ts";
 import { getDb } from "./db.ts";
 import { RegisteringConcept } from "./concepts/Registering/Registering.ts";
 import { Authenticating } from "./concepts/Authenticating/registry.ts";

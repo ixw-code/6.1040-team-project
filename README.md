@@ -62,5 +62,17 @@ bun run dev:frontend
 ## Backend tests
 
 Run the backend tests with `bun test tests/` while MongoDB is running.
-The CompletionChecking tests supply temporary sessions, roles, and tasks. The application
-requires the team's implementations of those operations to serve authenticated requests.
+The CompletionChecking tests use real login cookies and stored photos with temporary
+roles and tasks. The application needs the team's role and task hooks to serve live submissions.
+
+## Photo uploads
+
+Send a signed-in `POST /api/photos` request with the image file as the request body
+and its `Content-Type` set to `image/jpeg`, `image/png`, or `image/webp`. Uploads can
+be up to 1 MiB. The response contains a `photo` ID and the route for reading the image.
+`GET /api/photos/:photo` returns the stored image to its uploader using the same session cookie.
+After a photo is submitted for a chore, `GET /api/completion/submissions/:submission/photo`
+lets the submitting resident and the household's Overseer view it through that submission.
+
+For browser login and uploads in local development, set `PUBLIC_ORIGIN` to the URL
+you open in the browser, such as `http://localhost:5173` for Vite.
