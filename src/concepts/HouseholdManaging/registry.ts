@@ -10,6 +10,7 @@ import {
   HouseholdOverseerConflict,
   HouseholdResidentConflict,
   HouseholdResidentNotFound,
+  PreferenceLevelInvalid
 } from "./HouseholdManaging.ts";
 
 export const householdManaging = registerConcept({
@@ -24,5 +25,6 @@ export const householdManaging = registerConcept({
     CATEGORY_NAME_INVALID: CategoryNameInvalid,
     CATEGORY_NAME_CONFLICT: CategoryNameConflict,
     CATEGORY_NOT_FOUND: CategoryNotFound,
+    PREFERENCE_LEVEL_INVALID: PreferenceLevelInvalid,
   },
 });

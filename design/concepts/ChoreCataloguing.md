@@ -40,9 +40,10 @@ a set of Chores with
   a references set of Photo
   unique name and group
 
-Rule: a chore's category belongs to the same group as the chore
-Rule: a chore's name is nonempty
-Rule: difficulty weights are positive floats bounded in the range [1.0, 10.0] 
+Rule: the composition checks that a chore's category belongs to the same group as the chore
+Rule: a chore's name contains at least one non-whitespace character
+Rule: chore names are compared exactly, including case and surrounding whitespace
+Rule: difficulty weights are finite numbers bounded in the range [1.0, 10.0]
 ```
 
 ## Actions 
@@ -54,9 +55,12 @@ create(group: Group, name: String, description: String, category: Category, diff
   where chore name is invalid according to rules
   then
     refuses CHORE_NAME_INVALID "Chore name is invalid."
-  where chore with name for group doesn't already exist 
-  then 
-    add a new chore with name, description, group, difficulty, requirements, and photo references
+  where difficulty is invalid according to the rules
+  then
+    refuses CHORE_DIFFICULTY_INVALID "Chore difficulty must be in the range [1, 10]."
+  where name and difficulty are valid and name is unused in group
+  then
+    add a new chore with name, description, group, category, difficulty, requirements, and photo references
     returns chore
 
 updateDifficulty(chore: Chore, group: Group, difficulty: Number): returns (chore: Chore)
@@ -66,7 +70,7 @@ updateDifficulty(chore: Chore, group: Group, difficulty: Number): returns (chore
   where difficulty is invalid according to the rules
   then
     refuses CHORE_DIFFICULTY_INVALID "Chore difficulty must be in the range [1, 10]."
-  where chore exists 
+  where chore exists and difficulty is valid
   then
     update chore difficulty to difficulty
     returns chore
@@ -78,7 +82,10 @@ updateDetails(chore: Chore, group: Group, newCategory: Category, newName: String
   where newName is invalid according to the rules
   then
     refuses CHORE_NAME_INVALID "Chore name is invalid."
-  where chore exists 
+  where another chore in group has newName
+  then
+    refuses CHORE_NAME_CONFLICT "Chore with the same name already exists."
+  where chore exists, newName is valid, and no other chore in group has newName
   then
     update chore name, description, and category
     returns chore
@@ -108,7 +115,6 @@ remove(chore: Chore, group: Group): returns (chore: Chore, group: Group)
   where chore exists 
   then
     remove that chore
-    remove all preferences related to that achore
     returns chore, group
 ```
 
@@ -118,8 +124,8 @@ _get(chore: Chore) : many (group: Group, name: String, category: Category, diffi
   Returns the details of the chore if it exists, or no rows if it does not.
 
 _chores(group: Group, sortByDifficulty: Flag) : many (chore: Chore, name: String, description: String, category: Category, difficulty: Number, requirements: RequirementSet, references: PhotoSet)
-  Returns all the chores associated with a given group, in alphabetical order by default, or sorted by ascending difficulty. 
+  Returns all the chores associated with a given group, in alphabetical order by name when sortByDifficulty is false, or by ascending difficulty then name when it is true. Breaks remaining ties by chore identity and returns no rows when none match.
 
 _choresByCategory(group: Group, category: Category, sortByDifficulty: Flag) : many (chore: Chore, name: String, description: String, difficulty: Number, requirements: RequirementSet, references: PhotoSet)
-  Returns the chores associated with a group and category, in alphabetical order by default, or sorted by ascending difficulty.
+  Returns the chores associated with a group and category, in alphabetical order by name when sortByDifficulty is false, or by ascending difficulty then name when it is true. Breaks remaining ties by chore identity and returns no rows when none match.
 ```
