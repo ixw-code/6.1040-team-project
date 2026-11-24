@@ -35,7 +35,7 @@ Only the household overseer can create tasks for their household. The [CanManage
 
 The [create-a-task endpoint](reaction:ChoreAssignments.CreateTask) coordinates the permission checks and invokes `TaskScheduling.add` with the chore's identity, category, difficulty weight, and at least one of a deadline and interval. The endpoint reads category and difficulty from the catalogue rather than accepting them in the request. Omission or null clears timing on the respective update endpoint, subject to the task's timing invariants. Later changes to the chore's weight or category in its definition in `ChoreCataloguing` do not change tasks already created. A resident's total reflects the weight each task had when it was created.
 
-The overseer can also [remove incomplete tasks](reaction:ChoreAssignments.RemoveTask), [update deadlines](reaction:ChoreAssignments.UpdateDeadline), or [update scheduled intervals](reaction:ChoreAssignments.UpdateInterval). The [AssignmentIsModifiable view](view:ChoreAssignments.AssignmentIsModifiable) checks that the task belongs to the household and is incomplete before allowing modification, and the endpoints use the corresponding `TaskScheduling` actions.
+The overseer can also [remove incomplete tasks](reaction:ChoreAssignments.RemoveTask), [update deadlines](reaction:ChoreAssignments.UpdateDeadline), or [update scheduled intervals](reaction:ChoreAssignments.UpdateInterval). The [AssignmentIsModifiable view](view:ChoreAssignments.AssignmentIsModifiable) uses TaskScheduling._incomplete to check that the task belongs to the household and is incomplete before allowing modification, and the endpoints use the corresponding `TaskScheduling` actions.
 
 Requests are refused with `TASK_WEIGHT_INVALID` for invalid weights, `TASK_INTERVAL_INVALID` for invalid timing, `NOT_FOUND` for nonexistent tasks, or `TASK_STATUS_CONFLICT` for modifications to completed tasks. Invalid chore references are refused with `NOT_FOUND`; unauthorized requests with `ACCESS_DENIED`, and unauthenticated requests with `UNAUTHENTICATED`.
 
@@ -104,7 +104,7 @@ ChoreAssignments.GetHouseholdOverview at /assignments/overview
 ### Assumptions
 The composition assumes that all household residents, including the overseer, are eligible for assignment. HouseholdManaging owns membership, oversight, and preferences, while TaskScheduling owns availability, assignments, and completion state. Authorization is checked by the composition using `Sessioning.use` on the existing session cookie. Signed-out requests use the shared `NOT_SIGNED_IN` refusal for the unauthenticated case. The HTTP policy maps it to 401 and preserves the standard HTTP categories for the other domain refusals.
 
-We also assume that tasks are created manually for a given week by the overseer prior to assignment. Timing inputs use UTC ISO timestamps and intervals use start and end. The request flow supplies the clock for display status.
+We also assume that tasks are created manually for a given week by the overseer prior to assignment. Timing inputs use UTC ISO timestamps and intervals use start and end. The request flow supplies the timestamp used by TaskScheduling._status for display status.
 
 ```computations
 assignmentDate(value: String) : DateTime
@@ -115,10 +115,6 @@ assignmentPeople(entries: ScheduleEntries) : People
   Returns the distinct assignees supplied in the batch.
 matchesPersonalTask(person: String, assignee?: String, completedBy?: String, mode: String) : TaskMatch
   Reports whether the resident matches the assignment or completion filter.
-assignmentStatus(deadline?: DateTime, interval?: Interval, completedAt?: DateTime, asOf: DateTime) : String
-  Derives the task status using the same cutoff as TaskScheduling.
-assignmentIsIncomplete(completedAt?: DateTime) : IncompleteMatch
-  Reports whether the task has no completion timestamp.
 ```
 
 Alpha supports the join/leave, availability-setting, task creation, weekly and manual scheduling, and schedule reading behavior for the current ChoreAssignment app. Swapping between two parties can be coordinated primitively, ie external to the app and overseers manually reassign them.

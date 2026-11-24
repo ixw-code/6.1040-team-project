@@ -63,7 +63,7 @@ function clearAssignment(task: Task): void {
   delete task.source;
 }
 
-function isCompleted(task: Task): task is Task & Completion {
+function isCompleted<T extends Partial<Completion>>(task: T): task is T & Completion {
   return task.completedAt !== undefined && task.completedBy !== undefined;
 }
 
@@ -103,7 +103,7 @@ function taskStart(task: Task): Date {
   return task.interval?.start ?? task.deadline!;
 }
 
-export function statusAt(task: Pick<Task, "interval" | "deadline" | "completedAt">, now: Date): Status {
+function statusAt(task: Pick<Task, "interval" | "deadline" | "completedAt">, now: Date): Status {
   const cutoff = task.interval?.end ?? task.deadline!;
   if (task.completedAt) return task.completedAt > cutoff ? "COMPLETED_LATE" : "COMPLETED";
   return now > cutoff ? "OVERDUE" : "PENDING";
@@ -369,6 +369,16 @@ export class TaskSchedulingConcept {
     if (!state) return [];
     const [{ task: _task, ...details }] = state.tasks;
     return [{ group: state._id, ...details }];
+  }
+
+  async _status({ task, asOf }: TaskRef & { asOf: Date }): Promise<{ status: Status }[]> {
+    const [details] = await this._get({ task });
+    return details ? [{ status: statusAt(details, asOf) }] : [];
+  }
+
+  async _incomplete({ task }: TaskRef): Promise<GroupRef[]> {
+    const [details] = await this._get({ task });
+    return details && !isCompleted(details) ? [{ group: details.group }] : [];
   }
 
   async _tasks({ group }: GroupRef): Promise<TaskRow[]> {

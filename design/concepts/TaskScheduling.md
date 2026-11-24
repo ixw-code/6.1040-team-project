@@ -285,6 +285,12 @@ uncomplete(task: Task): returns (task: Task, lastCompletedBy: Person, lastComple
 _get(task: Task) : optional (group: Group, item: Item, category: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)
   Returns task details if task exists, or no rows otherwise.
 
+_status(task: Task, asOf: DateTime) : optional (status: Status)
+  Returns the task status, or no row for an unknown task. The cutoff is the interval end when present, otherwise the deadline. Incomplete tasks are overdue only when asOf is after the cutoff. Completed tasks are late only when completed after the cutoff.
+
+_incomplete(task: Task) : optional (group: Group)
+  Returns the owning group for an incomplete task. Returns no row for missing or completed tasks.
+
 _tasks(group: Group) : many (task: Task, item: Item, category: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)
   Returns all tasks belonging to a group, ordered by interval start when present, otherwise by deadline, with ties broken by task identity. Returns no rows when none match.
 

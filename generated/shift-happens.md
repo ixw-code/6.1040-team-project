@@ -261,6 +261,8 @@ Defined in [TaskScheduling](../design/concepts/TaskScheduling.md), line 1.
 #### Queries
 
 - `_get(task: Task) : optional (group: Group, item: Item, category: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)`
+- `_status(task: Task, asOf: DateTime) : optional (status: Status)`
+- `_incomplete(task: Task) : optional (group: Group)`
 - `_tasks(group: Group) : many (task: Task, item: Item, category: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)`
 - `_schedule(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, category: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)`
 - `_pending(group: Group, asOf: DateTime) : many (task: Task, item: Item, assignee?: Person, interval?: Interval, deadline?: DateTime, status: Status)`
@@ -290,9 +292,7 @@ Concrete types:
 
 - `assignmentDate(value: String) : DateTime` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
 - `assignmentInterval(value: IntervalInput) : Interval` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
-- `assignmentIsIncomplete(completedAt?: DateTime) : IncompleteMatch` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 120.
 - `assignmentPeople(entries: ScheduleEntries) : People` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 114.
-- `assignmentStatus(deadline?: DateTime, interval?: Interval, completedAt?: DateTime, asOf: DateTime) : String` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 118.
 - `matchesPersonalTask(person: String, assignee?: String, completedBy?: String, mode: String) : TaskMatch` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 116.
 
 ## Views
@@ -401,11 +401,8 @@ Authored path: `ChoreAssignments.AssignmentIsModifiable`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 38.
 
 ```view
-(task) is an incomplete task in (household) — inputs (task, household); outputs (); bindings (completedAt)
-  where
-    TaskScheduling._get (task) has (group: household)
-    whether TaskScheduling._get (task) has (completedAt)
-    (incomplete: true) is assignmentIsIncomplete (completedAt)
+(task) is an incomplete task in (household) — inputs (task, household); outputs (); bindings ()
+  where TaskScheduling._incomplete (task) has (group: household)
 ```
 
 ### (task) matches (mode) for (person)
@@ -467,7 +464,7 @@ Former "the display details of (task) in (household) at (asOf)" — inputs (task
     where whether TaskScheduling._get (task) has (interval)
     where whether TaskScheduling._get (task) has (assignee, source)
     where whether TaskScheduling._get (task) has (completedAt, completedBy)
-    where status is assignmentStatus (asOf, completedAt, deadline, interval)
+    where TaskScheduling._status (asOf, task) has (status)
     assignee
     category
     categoryName: the name of the first HouseholdManaging._categories (household) has (category, name)
