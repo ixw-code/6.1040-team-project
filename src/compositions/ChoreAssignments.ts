@@ -3,7 +3,7 @@ import { compute, each, former, is, no, now, reaction, view, when, where, whethe
 import { concepts, computations } from "../concepts.ts";
 
 const { HouseholdManaging, ChoreCataloguing, TaskScheduling, Sessioning } = concepts;
-const { assignmentDate, assignmentInterval, assignmentPeople, assignmentStatus, matchesPersonalTask, assignmentIsIncomplete } = computations;
+const { assignmentDate, assignmentInterval, assignmentPeople, matchesPersonalTask } = computations;
 
 const CanManageSchedule = view("(requester) oversees (household)", ({ requester, household }) =>
   where(HouseholdManaging._household({ household }).is({ overseer: requester })),
@@ -36,10 +36,8 @@ const ValidHouseholdChore = view(
 
 const AssignmentIsModifiable = view(
   "(task) is an incomplete task in (household)",
-  ({ task, household }, _outputs, { completedAt }) => where(
-    TaskScheduling._get({ task }).is({ group: household }),
-    whether(TaskScheduling._get({ task }).is({ completedAt })),
-    compute(assignmentIsIncomplete, { completedAt }, { incomplete: true }),
+  ({ task, household }) => where(
+    TaskScheduling._incomplete({ task }).is({ group: household }),
   ),
 ).holds();
 
@@ -85,7 +83,7 @@ const ScheduleTaskDetails = former(
       whether(TaskScheduling._get({ task }).is({ interval })),
       whether(TaskScheduling._get({ task }).is({ assignee, source })),
       whether(TaskScheduling._get({ task }).is({ completedAt, completedBy })),
-      compute(assignmentStatus, { deadline, interval, completedAt, asOf }, status),
+      TaskScheduling._status({ task, asOf }).is({ status }),
     ).form({
       task, item, category, deadline, interval, assignee, source, completedAt, completedBy, weight, status,
       categoryName: each(HouseholdManaging._categories({ household }).is({ category, name })).first(name),

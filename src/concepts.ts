@@ -4,15 +4,16 @@ import { ranking } from "./concepts/Ranking/registry.ts";
 import { registering } from "./concepts/Registering/registry.ts";
 import { authenticating } from "./concepts/Authenticating/registry.ts";
 import { sessioning } from "./concepts/Sessioning/registry.ts";
-
 import { householdManaging } from "./concepts/HouseholdManaging/registry.ts";
 import { choreCataloguing } from "./concepts/ChoreCataloguing/registry.ts";
 import { taskScheduling } from "./concepts/TaskScheduling/registry.ts";
 
 import {
-    assignmentDate, assignmentInterval, assignmentIsIncomplete,
-    assignmentPeople, assignmentStatus, matchesPersonalTask,
-} from "./compositions/assignmentComputations.ts";
+    assignmentDate, assignmentInterval,
+    assignmentPeople, matchesPersonalTask,
+} from "./helpers/assignments.ts";
+
+import { evidenceInstructions } from "./helpers/evidenceInstructions.ts";
 
 export const applicationConceptSet = conceptSet({
     HouseholdManaging: householdManaging,
@@ -24,7 +25,8 @@ export const applicationConceptSet = conceptSet({
     Authenticating: authenticating, 
     Sessioning: sessioning
 }, {
-    assignmentDate, assignmentInterval, assignmentIsIncomplete,
-    assignmentPeople, assignmentStatus, matchesPersonalTask,
+    evidenceInstructions,
+    assignmentDate, assignmentInterval,
+    assignmentPeople, matchesPersonalTask,
 });
 export const { concepts, computations } = applicationConceptSet;
