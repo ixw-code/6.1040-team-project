@@ -2,8 +2,8 @@
 
 ```types
 concrete Person
-  A person of the app (TBA from Registering) 
-  
+  A person of the app (TBA from Registering)
+
 concrete Household
   A group whose residents share chores.
 
@@ -18,7 +18,32 @@ concrete ReviewerIdentity
 ```
 
 ```instances
-instantiate HouseholdManaging 
+instantiate Ranking with
+  Group is Household
+  Person is Person
+  Contribution is TaskOccurrence
+
+instantiate PhotoChecking with
+  Person is Person
+  Subject is TaskOccurrence
+  Photo is PhotoReference
+  Reviewer is ReviewerIdentity
+
+instantiate Registering
+
+instantiate Authenticating with
+  User is Registering.User
+
+instantiate Sessioning with
+  Subject is Registering.User
+```
+
+## Planned household and scheduling bindings
+
+Add these bindings when the three concepts are assembled. Use `HouseholdManaging.Household` for `Ranking.Group` and `TaskScheduling.Task` for `Ranking.Contribution` and `PhotoChecking.Subject` at that point.
+
+```text
+instantiate HouseholdManaging with
   Person is Person
 
 instantiate ChoreCataloguing with
@@ -31,23 +56,4 @@ instantiate TaskScheduling with
   Group is HouseholdManaging.Household
   Category is HouseholdManaging.Category
   Item is ChoreCataloguing.Chore
-
-instantiate Ranking with
-  Group is HouseholdManaging.Household
-  Person is Person
-  Contribution is TaskScheduling.Task
-
-instantiate PhotoChecking with
-  Person is Person
-  Subject is TaskScheduling.Task
-  Photo is PhotoReference
-  Reviewer is ReviewerIdentity
-
-instantiate Registering
-
-instantiate Authenticating with
-  User is Registering.User
-
-instantiate Sessioning with
-  Subject is Registering.User
 ```

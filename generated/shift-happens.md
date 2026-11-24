@@ -126,8 +126,8 @@ Defined in [Sessioning](../design/concepts/Sessioning.md), line 1.
 
 Concrete types:
 
-- `Household` — [Shift Happens Application Types](../design/types.md), line 4.
-- `Person` — [Shift Happens Application Types](../design/types.md), line 7.
+- `Household` — [Shift Happens Application Types](../design/types.md), line 7.
+- `Person` — [Shift Happens Application Types](../design/types.md), line 4.
 - `PhotoReference` — [Shift Happens Application Types](../design/types.md), line 13.
 - `ReviewerIdentity` — [Shift Happens Application Types](../design/types.md), line 16.
 - `TaskOccurrence` — [Shift Happens Application Types](../design/types.md), line 10.
