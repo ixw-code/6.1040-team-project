@@ -1,10 +1,9 @@
 <script setup lang="ts">
+import ResidentApp from "./resident/ResidentApp.vue";
 const appName = "Shift Happens";
 </script>
 
 <template>
-  <main>
-    <h1>{{ appName }}</h1>
-    <p>Your household, working together.</p>
-  </main>
+  <h1>{{ appName }}</h1>
+  <ResidentApp />
 </template>
