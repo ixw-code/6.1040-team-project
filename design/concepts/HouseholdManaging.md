@@ -17,8 +17,11 @@ As overseer, Alice can update the household and category details or transfer ove
 external Person
   A user who can join a household.
 
-enum PreferenceLevel is PREFER, NEUTRAL, or AVOID
+PreferenceLevel is PREFER or NEUTRAL or AVOID
   How a person feels about a household work category.
+
+opaque CategorySet
+  A set of categories.
 ```
 
 
@@ -146,8 +149,7 @@ renameCategory(household: Household, category: Category, name: String) : returns
   where another category with name already belongs to household
   then
     refuses CATEGORY_NAME_CONFLICT "A category with this name already exists."
-  where category belongs to household and name is nonempty
-    and no other category in household has name
+  where category belongs to household and name is nonempty and no other category in household has name
   then
     update the category's name
     returns category
@@ -172,9 +174,10 @@ setPreference(household: Household, person: Person, category: Category, preferen
   where category does not belong to household
   then
     refuses CATEGORY_NOT_FOUND "This category does not belong to the household."
-  otherwise
+  where person is a resident and category belongs to household
+  then
     update the residency's preference level for category
-    returns
+    returns preference
 
 remove(household: Household) : returns (household: Household)
   where household does not exist
@@ -191,10 +194,10 @@ remove(household: Household) : returns (household: Household)
 
 ## Queries
 ```queries
-_household(household: Household) : (name: String, overseer: Person)
+_household(household: Household) : optional (name: String, overseer: Person)
   Return the household details.
 
-_householdsByPerson(person: Person) : many (household: Household, name: String, overseer: Person, categories: set of Category)
+_householdsByPerson(person: Person) : many (household: Household, name: String, overseer: Person, categories: CategorySet)
   Returns the households that the person is a resident of, in alphabetical order by name.
 
 _categories(household: Household) : many (category: Category)

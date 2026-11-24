@@ -15,7 +15,7 @@ concrete ReviewerIdentity
 ```
 
 ```instances
-instantiate HouseholdManaging 
+instantiate HouseholdManaging with
   Person is Registering.User
 
 instantiate ChoreCataloguing with
