@@ -22,8 +22,6 @@
   color: var(--rs-cork-ink);
   font-family: "Times New Roman", Times, serif;
   font-size: 17px;
-  /* style.css sets font-synthesis: none on :root, which blocks the small-caps headings. */
-  font-synthesis: small-caps;
 }
 .resident *, .resident *::before, .resident *::after { box-sizing: border-box; }
 

@@ -20,6 +20,8 @@ References above to "the Overseer" are designated by `Roling`.  `Roling` defines
 
 The orange boxes on the concept map represent second-priority features. If the other features are working, we will add:
 
+`Trading` to handle the state of persistent swaps all within the application.
+
 `Reminding` to notify users if the deadline for their chore is approaching and it is still incomplete.
 
 `Rewarding` would include household-determined rewards, such as extra rank or a discount on utilities (for example), to users who complete a particular set of chores or a quantity of chores.
