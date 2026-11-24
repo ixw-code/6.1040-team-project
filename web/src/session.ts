@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { api } from "./api.ts";
 
 interface Me {
+  user: string;
   username: string;
 }
 

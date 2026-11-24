@@ -3413,7 +3413,7 @@ where
   Registering._username (user) has (username)
   earlier, RequestBoundary.request (path: "/user/me", requestId, session)
 then
-  RequestBoundary.respond (requestId, username)
+  RequestBoundary.respond (requestId, user, username)
 ```
 
 ## Endpoint input contracts
