@@ -1,9 +1,6 @@
 import { Binary, type Db } from "mongodb";
-import type { assembleApplication } from "../assembly.ts";
-import type { Session } from "../concepts/Sessioning/Sessioning.ts";
-import { maxRequestBodyBytes, policy, sessionCookieName } from "../http.ts";
+import { allowsAppOrigin, maxRequestBodyBytes, signedInPerson } from "../http.ts";
 
-type Sessioning = ReturnType<typeof assembleApplication>["concepts"]["Sessioning"];
 type PhotoType = "image/jpeg" | "image/png" | "image/webp";
 
 type StoredPhoto = {
@@ -38,9 +35,38 @@ function error(status: number, code: string, headers?: Record<string, string>) {
   return Response.json({ error: code }, { status, headers: { "Cache-Control": "no-store", ...headers } });
 }
 
-export function createPhotoHandler(db: Db, sessions: Sessioning) {
+export function createPhotoStore(db: Db) {
   const photos = db.collection<StoredPhoto>("completion_photos");
 
+  return {
+    async save(owner: string, contentType: PhotoType, bytes: Buffer): Promise<string> {
+      const photo = crypto.randomUUID();
+      await photos.insertOne({ _id: photo, owner, contentType, bytes: new Binary(bytes) });
+      return photo;
+    },
+    async owns(photo: string, owner: string): Promise<boolean> {
+      return Boolean(await photos.findOne({ _id: photo, owner }, { projection: { _id: 1 } }));
+    },
+    read(photo: string, owner: string) {
+      return photos.findOne({ _id: photo, owner });
+    },
+  };
+}
+
+export type PhotoStore = ReturnType<typeof createPhotoStore>;
+
+export function photoResponse(stored: StoredPhoto): Response {
+  return new Response(new Uint8Array(stored.bytes.value()), {
+    headers: {
+      "Content-Type": stored.contentType,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Cross-Origin-Resource-Policy": "same-origin",
+    },
+  });
+}
+
+export function createPhotoHandler(photos: PhotoStore, sessions: Parameters<typeof signedInPerson>[1]) {
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
     const uploading = path === photoPath;
@@ -49,29 +75,15 @@ export function createPhotoHandler(db: Db, sessions: Sessioning) {
     const method = uploading ? "POST" : "GET";
     if (request.method !== method) return error(405, "METHOD_NOT_ALLOWED", { Allow: method });
 
-    const origin = request.headers.get("origin");
-    if (origin !== null && origin !== policy.publicOrigin) return error(403, "FORBIDDEN");
+    if (!allowsAppOrigin(request)) return error(403, "FORBIDDEN");
 
     try {
-      const cookies = new Bun.CookieMap(request.headers.get("cookie") ?? "");
-      const token = cookies.get(sessionCookieName);
-      if (!token) return error(401, "UNAUTHORIZED");
-      const session = await sessions.use({ session: token as Session });
-      if ("error" in session) return error(401, "UNAUTHORIZED");
-      const owner = session.subject;
+      const owner = await signedInPerson(request, sessions);
+      if (!owner) return error(401, "UNAUTHORIZED");
 
       if (photo) {
-        // Restrict the database lookup to the signed-in owner until review access is wired in.
-        const stored = await photos.findOne({ _id: photo, owner });
-        if (!stored) return error(404, "NOT_FOUND");
-        return new Response(new Uint8Array(stored.bytes.value()), {
-          headers: {
-            "Content-Type": stored.contentType,
-            "Cache-Control": "private, no-store",
-            "X-Content-Type-Options": "nosniff",
-            "Cross-Origin-Resource-Policy": "same-origin",
-          },
-        });
+        const stored = await photos.read(photo, owner);
+        return stored ? photoResponse(stored) : error(404, "NOT_FOUND");
       }
 
       const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
@@ -85,8 +97,7 @@ export function createPhotoHandler(db: Db, sessions: Sessioning) {
       const bytes = Buffer.from(body);
       if (!matchesImageType(bytes, contentType)) return error(400, "INVALID_PHOTO");
 
-      const id = crypto.randomUUID();
-      await photos.insertOne({ _id: id, owner, contentType, bytes: new Binary(bytes) });
+      const id = await photos.save(owner, contentType, bytes);
       return Response.json({ photo: id }, {
         status: 201,
         headers: { "Cache-Control": "no-store", Location: `${photoPath}/${id}` },

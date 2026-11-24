@@ -2,7 +2,7 @@ import { createGateway } from "@mit-sdg/sync-engine/boundary";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { assembleApplication } from "./assembly.ts";
 import { createCompletionHandler } from "./compositions/CompletionChecking.ts";
-import { createPhotoHandler } from "./compositions/Photos.ts";
+import { createPhotoHandler, createPhotoStore } from "./compositions/Photos.ts";
 import { maxRequestBodyBytes, policy } from "./http.ts";
 import { getDb } from "./db.ts";
 
@@ -10,7 +10,8 @@ const db = getDb();
 const application = assembleApplication();
 const gateway = createGateway({ application });
 const api = createHttpHandler({ application, gateway, policy });
-const photos = createPhotoHandler(db, application.concepts.Sessioning);
+const photoStore = createPhotoStore(db);
+const photos = createPhotoHandler(photoStore, application.concepts.Sessioning);
 
 const server = Bun.serve({
   hostname: process.env.HOST ?? "127.0.0.1",
@@ -19,7 +20,7 @@ const server = Bun.serve({
   routes: {
     "/api/photos": photos,
     "/api/photos/:photo": photos,
-    "/api/completion/*": createCompletionHandler(application.concepts),
+    "/api/completion/*": createCompletionHandler(application.concepts, photoStore),
     "/api/*": api,
     "/health": async () => {
       try {
