@@ -120,7 +120,7 @@ remove(chore: Chore, group: Group): returns (chore: Chore, group: Group)
 
 ## Queries 
 ```queries
-_get(chore: Chore) : many (group: Group, name: String, category: Category, difficulty: Number, description: String, requirements: RequirementSet, references: PhotoSet)
+_get(chore: Chore) : optional (group: Group, name: String, category: Category, difficulty: Number, description: String, requirements: RequirementSet, references: PhotoSet)
   Returns the details of the chore if it exists, or no rows if it does not.
 
 _chores(group: Group, sortByDifficulty: Flag) : many (chore: Chore, name: String, description: String, category: Category, difficulty: Number, requirements: RequirementSet, references: PhotoSet)

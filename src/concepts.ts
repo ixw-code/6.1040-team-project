@@ -9,6 +9,11 @@ import { householdManaging } from "./concepts/HouseholdManaging/registry.ts";
 import { choreCataloguing } from "./concepts/ChoreCataloguing/registry.ts";
 import { taskScheduling } from "./concepts/TaskScheduling/registry.ts";
 
+import {
+    assignmentDate, assignmentInterval, assignmentIsIncomplete,
+    assignmentPeople, assignmentStatus, matchesPersonalTask,
+} from "./compositions/assignmentComputations.ts";
+
 export const applicationConceptSet = conceptSet({
     HouseholdManaging: householdManaging,
     ChoreCataloguing: choreCataloguing,
@@ -18,5 +23,8 @@ export const applicationConceptSet = conceptSet({
     Registering: registering, 
     Authenticating: authenticating, 
     Sessioning: sessioning
+}, {
+    assignmentDate, assignmentInterval, assignmentIsIncomplete,
+    assignmentPeople, assignmentStatus, matchesPersonalTask,
 });
-export const { concepts } = applicationConceptSet;
+export const { concepts, computations } = applicationConceptSet;

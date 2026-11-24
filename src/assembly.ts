@@ -6,6 +6,7 @@ import { getDb } from "./db.ts";
 import { RegisteringConcept } from "./concepts/Registering/Registering.ts";
 import { Authenticating } from "./concepts/Authenticating/registry.ts";
 import { Sessioning } from "./concepts/Sessioning/registry.ts";
+import { composition as ChoreAssignments } from "./compositions/ChoreAssignments.ts";
 import { composition as Users } from "./compositions/Users.ts";
 
 import { composition as HouseholdManagement } from "./compositions/HouseholdManagement.ts";
@@ -20,6 +21,7 @@ export function assembleApplication(database = getDb) {
     composition: {
       Users,
       HouseholdManagement,
+      ChoreAssignments,
     },
     instances: {
       HouseholdManaging: new HouseholdManagingConcept(database),

@@ -20,6 +20,15 @@ external Person
 PreferenceLevel is PREFER or NEUTRAL or AVOID
   How a person feels about a household work category.
 
+opaque PersonSet
+  A set of people.
+
+opaque ResidentRows
+  A set of rows, each with person: Person.
+
+opaque SchedulingPreferences
+  A set of rows, each with person: Person, category: Category, and preferenceLevel: PreferenceLevel.
+
 opaque CategorySet
   A set of categories.
 ```
@@ -209,6 +218,12 @@ _categories(household: Household) : many (category: Category, name: String)
 
 _residents(household: Household) : many (person: Person)
   Returns the residents belonging to the household in the order they joined, or no rows if the household is unknown.
+
+_schedulingInputs(household: Household) : one (people: ResidentRows, preferences: SchedulingPreferences)
+  Returns the residents and their category preferences from the same household state, or two empty sets if the household does not exist.
+
+_allResidents(household: Household, people: PersonSet) : one (all: Flag)
+  Returns whether each supplied person is a resident of the household. Returns true for an empty set and false for a nonempty set when the household is unknown.
 
 _preferences(household: Household, person: Person) : many (category: Category, preferenceLevel: PreferenceLevel)
   Returns the preference levels for each category for a person in the household, ordered as in _categories. Returns no rows if the household or residency is unknown or there are no categories.

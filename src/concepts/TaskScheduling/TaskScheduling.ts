@@ -103,9 +103,9 @@ function taskStart(task: Task): Date {
   return task.interval?.start ?? task.deadline!;
 }
 
-function statusAt(task: Task, now: Date): Status {
+export function statusAt(task: Pick<Task, "interval" | "deadline" | "completedAt">, now: Date): Status {
   const cutoff = task.interval?.end ?? task.deadline!;
-  if (isCompleted(task)) return task.completedAt > cutoff ? "COMPLETED_LATE" : "COMPLETED";
+  if (task.completedAt) return task.completedAt > cutoff ? "COMPLETED_LATE" : "COMPLETED";
   return now > cutoff ? "OVERDUE" : "PENDING";
 }
 
@@ -189,6 +189,7 @@ export class TaskSchedulingConcept {
 
   async remove({ task }: TaskRef): Promise<TaskRef> {
     return this.#updateTask(task, (entry, state) => {
+      if (isCompleted(entry)) throw new TaskStatusConflict("A completed task cannot be removed.");
       state.tasks.splice(state.tasks.indexOf(entry), 1);
       return { task };
     });
@@ -407,9 +408,9 @@ export class TaskSchedulingConcept {
     (TaskRef & { completedAt: Date; status: Status })[]
   > {
     return (await this.#tasks(group)).filter(isCompleted).filter((task) => task.completedBy === person)
-      .sort(completionOrder).map(({ completedBy, ...task }) => ({
+      .sort(completionOrder).map((task) => ({
         task: task.task, completedAt: task.completedAt,
-        status: statusAt({ ...task, completedBy }, task.completedAt),
+        status: statusAt(task, task.completedAt),
       }));
   }
 

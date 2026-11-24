@@ -122,7 +122,10 @@ remove(task: Task): returns (task : Task)
   where task doesn't exist
   then
     refuses TASK_NOT_FOUND "There is no such task on the schedule."
-  where task exists
+  where task is already completed
+  then
+    refuses TASK_STATUS_CONFLICT "A completed task cannot be removed."
+  where task exists and is incomplete
   then
     remove task
     returns task

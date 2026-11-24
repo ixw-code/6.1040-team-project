@@ -226,6 +226,26 @@ export class HouseholdManagingConcept {
     return state?.residents.map(({ person }) => ({ person })) ?? [];
   }
 
+  async _schedulingInputs({ household }: HouseholdRef): Promise<{
+    people: PersonRef[];
+    preferences: (PersonRef & PreferenceRow)[];
+  }> {
+    const state = await this.#households().findOne({ _id: household });
+    if (!state) return { people: [], preferences: [] };
+    return {
+      people: state.residents.map(({ person }) => ({ person })),
+      preferences: state.residents.flatMap(({ person, preferences }) =>
+        state.categories.map(({ category }) => ({
+          person, category, preferenceLevel: preferences[category].preferenceLevel,
+        }))),
+    };
+  }
+
+  async _allResidents({ household, people }: HouseholdRef & { people: string[] }): Promise<{ all: boolean }> {
+    const residents = new Set((await this._residents({ household })).map(({ person }) => person));
+    return { all: people.every((person) => residents.has(person)) };
+  }
+
   async _preferences({ household, person }: HouseholdRef & PersonRef): Promise<PreferenceRow[]> {
     const state = await this.#households().findOne({ _id: household });
     const resident = state?.residents.find((entry) => entry.person === person);
