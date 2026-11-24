@@ -15,10 +15,17 @@ const people = ref<Person[]>([]);
 const loading = ref(true);
 
 const from = startOfDay(new Date());
+const failed = ref(false);
+
 onMounted(async () => {
   const until = new Date(from); until.setDate(until.getDate() + 7);
-  [tasks.value, people.value] = await Promise.all([getSchedule(from, until), getPeople()]);
-  loading.value = false;
+  try {
+    [tasks.value, people.value] = await Promise.all([getSchedule(from, until), getPeople()]);
+  } catch {
+    failed.value = true;
+  } finally {
+    loading.value = false;
+  }
 });
 
 const byId = computed(() => new Map(people.value.map((p) => [p.id, p])));
@@ -39,7 +46,8 @@ const shown = computed(() => tasks.value
       <li v-for="p in others" :key="p.id"><span class="swatch" :style="{ background: p.color }" />{{ p.name }}</li>
     </ul>
 
-    <p v-if="loading" class="rs-status-line rs-hand">Loading…</p>
+    <p v-if="failed" class="rs-status-line rs-hand rs-error">Couldn't load the calendar. Try again.</p>
+    <p v-else-if="loading" class="rs-status-line rs-hand">Loading…</p>
     <WeekGrid v-else :items="shown" :from="from">
       <template #item="{ item }">
         <StickyNote

@@ -14,10 +14,17 @@ const people = ref<Person[]>([]);
 const loading = ref(true);
 
 const from = startOfDay(new Date());
+const failed = ref(false);
+
 onMounted(async () => {
   const until = new Date(from); until.setDate(until.getDate() + 7);
-  [blocks.value, people.value] = await Promise.all([getAvailability(from, until), getPeople()]);
-  loading.value = false;
+  try {
+    [blocks.value, people.value] = await Promise.all([getAvailability(from, until), getPeople()]);
+  } catch {
+    failed.value = true;
+  } finally {
+    loading.value = false;
+  }
 });
 
 /** You first, then everyone else; each person gets a fixed lane. */
@@ -49,7 +56,8 @@ const items = computed(() => {
       <li v-for="p in shownPeople" :key="p.id"><span class="swatch" :style="{ background: p.color }" />{{ p.isMe ? "You" : p.name }}</li>
     </ul>
 
-    <p v-if="loading" class="rs-status-line rs-hand">Loading…</p>
+    <p v-if="failed" class="rs-status-line rs-hand rs-error">Couldn't load availability. Try again.</p>
+    <p v-else-if="loading" class="rs-status-line rs-hand">Loading…</p>
     <WeekGrid v-else :items="items" :from="from" :hour-px="34">
       <template #item="{ item }">
         <div class="block" role="img" :style="{ background: item.person.color }" :aria-label="`${item.person.name} free ${timeRange(item.start, item.end)}`">

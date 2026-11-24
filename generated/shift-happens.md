@@ -577,10 +577,12 @@ Authored path: `HouseholdManagement.HouseholdResidents`.
 - Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 81.
 
 ```former
-Former "the residents of (household)" — inputs (household); bindings (person); promises exactly one record — forms:
+Former "the residents of (household)" — inputs (household); bindings (person, username); promises exactly one record — forms:
   each HouseholdManaging._residents (household) has (person)
+    where whether Registering._username (user: person) has (username)
     form a record of
       person
+      username
 ```
 
 ### the schedule of (household) from (from) until (until) at (asOf)
@@ -3484,7 +3486,7 @@ where
   Registering._username (user) has (username)
   earlier, RequestBoundary.request (path: "/user/me", requestId, session)
 then
-  RequestBoundary.respond (requestId, username)
+  RequestBoundary.respond (requestId, user, username)
 ```
 
 ## Endpoint input contracts

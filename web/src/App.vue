@@ -9,7 +9,7 @@ import PasswordForm from "./PasswordForm.vue";
 import SignIn from "./SignIn.vue";
 import { useSession } from "./session.ts";
 
-const { me, checked, load, signOut } = useSession();
+const { me, household, checked, load, signOut } = useSession();
 onMounted(load);
 
 const role = ref<"overseer" | "resident">("resident");
@@ -21,7 +21,6 @@ const noteError = ref("");
 const noteField = ref<HTMLTextAreaElement>();
 const announcement = ref("");
 const homes = ref<{ household: string; name: string }[]>([]);
-const household = ref("");
 const choresById = ref<Record<string, Chore & { active: boolean; completed: boolean }>>({});
 const busy = ref(false);
 const saving = ref(false);
