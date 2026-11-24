@@ -105,6 +105,23 @@ Defined in [Registering](../design/concepts/Registering.md), line 1.
 
 - `Registering` — instance of `Registering` — [Shift Happens Application Types](../design/types.md), line 32.
 
+### Sessioning
+
+Defined in [Sessioning](../design/concepts/Sessioning.md), line 1.
+
+#### Actions
+
+- `start(subject: Subject) : returns (session: Session, expiresAt: DateTime)`
+- `use(session: Session) : returns (subject: Subject)`
+  - Refuses `NOT_SIGNED_IN`: Your session has ended. Sign in again.
+- `end(session: Session) : returns (session: Session)`
+  - Refuses `NOT_SIGNED_IN`: Your session has ended. Sign in again.
+
+#### Instances
+
+- `Sessioning` — instance of `Sessioning` — [Shift Happens Application Types](../design/types.md), line 37.
+  - `Subject` is `Registering.User` — [Shift Happens Application Types](../design/types.md), line 38.
+
 ## Application types
 
 Concrete types:

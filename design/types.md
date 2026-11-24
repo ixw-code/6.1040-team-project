@@ -33,4 +33,7 @@ instantiate Registering
 
 instantiate Authenticating with
   User is Registering.User
+
+instantiate Sessioning with
+  Subject is Registering.User
 ```
