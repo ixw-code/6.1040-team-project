@@ -8,11 +8,12 @@
 // These changes are currently in-progress.
 import * as mock from "./mockData.ts";
 import type {
-  Attempt, AvailabilityBlock, AvailabilityChange, Person, Preference, SwapOverview, SwapRequest, Task,
+  Attempt, AvailabilityBlock, AvailabilityChange, Person, Preference, SwapOverview, SwapRequest, Task, TaskStatus,
 } from "./types.ts";
 import { api } from "../api.ts";
 import { useSession } from "../session.ts";
 import { colorFor } from "./display.ts";
+import { completionRequest } from "../completion-api.ts";
 
 const delay = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
 const clone = <T>(value: T): T => structuredClone(value);
@@ -31,12 +32,57 @@ export async function getPeople(): Promise<Person[]> {
   }));
 }
 
-/** The signed-in resident's tasks for this week, for My Tasks. */
+type CompletionRow = {
+  completion: {
+    task: { criteria: string };
+    current: { status: string }[];
+  };
+};
+
+// Maps the backend's time status and latest review onto the four UI statuses.
+function uiStatus(completed: boolean, latest?: { status: string }): TaskStatus {
+  if (completed) return "approved";
+  if (latest?.status === "PENDING") return "submitted";
+  if (latest?.status === "REJECTED") return "redo";
+  return "todo";
+}
+
+/** The signed-in resident's tasks for the current week, for My Tasks. */
 export async function getMyTasks(): Promise<Task[]> {
-  // TODO(backend): TaskScheduling._schedule(group, weekStart, weekEnd) filtered to assignee = me,
-  // joined with CompletionChecking for each task's latest attempt → status.
-  await delay();
-  return clone(mock.tasks.filter((t) => t.ownerId === mock.ME));
+  const { household } = useSession();
+  const now = new Date();
+  const from = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+  const until = new Date(now.getTime() + 7 * 86_400_000).toISOString();
+
+  const result = await api.assignments.mine({
+    household: household.value,
+    from,
+    until,
+    mode: "assigned",
+  });
+  if ("error" in result) throw new Error(result.error);
+
+  return Promise.all(result.tasks.map(async (row) => {
+    const { completion } = await completionRequest<CompletionRow>(
+      "/completion/get",
+      { task: row.task },
+    );
+    const latest = completion.current[0];
+    const completed = row.status === "COMPLETED" || row.status === "COMPLETED_LATE";
+
+    return {
+      id: row.task,
+      title: row.chore?.name ?? "Chore",
+      ownerId: row.assignee ?? "",
+      start: row.interval?.start ?? row.deadline ?? "",
+      due: row.interval?.end ?? row.deadline ?? "",
+      status: uiStatus(completed, latest),
+      instructions: row.chore?.description ?? "",
+      criteria: completion.task.criteria,
+      references: [],
+      attempts: [],
+    };
+  }));
 }
 
 /** One task with its instructions, reference photos and attempts. Works for anyone's task. */
