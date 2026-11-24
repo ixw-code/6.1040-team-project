@@ -107,7 +107,7 @@ removeResident(household: Household, person: Person) : returns (residency: Resid
   where person is a resident and is not the overseer
   then
     remove the residency and associated preferences
-    returns the residency, household, and person
+    returns residency, household, person
 
 setOverseer(household: Household, person: Person) : returns (household: Household)
   where household does not exist
