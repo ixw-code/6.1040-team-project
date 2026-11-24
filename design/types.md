@@ -41,5 +41,13 @@ instantiate PhotoChecking with
   Person is Person
   Subject is TaskScheduling.Task
   Photo is PhotoReference
-  Reviewer is ReviewerIdentity  
+  Reviewer is ReviewerIdentity
+
+instantiate Registering
+
+instantiate Authenticating with
+  User is Registering.User
+
+instantiate Sessioning with
+  Subject is Registering.User
 ```
