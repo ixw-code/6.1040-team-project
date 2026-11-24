@@ -5,14 +5,14 @@ import {
   choresById, createPreviewAttempts, residentChore, reviewAttempt, statusOf, submitPhoto,
   type Decision, type Photo, type ReviewStatus,
 } from "./review-preview.ts";
-import PasswordForm from "./PasswordForm.vue";
-import SignIn from "./SignIn.vue";
+import ResidentApp from "./resident/ResidentApp.vue";
+import ResidentSignIn from "./resident/ResidentSignIn.vue";
 import { useSession } from "./session.ts";
 
 const { me, checked, load } = useSession();
 onMounted(load);
 
-const role = ref<"overseer" | "resident">("overseer");
+const role = ref<"overseer" | "resident">("resident");
 const filter = ref<"pending" | "reviewed">("pending");
 const attempts = ref(createPreviewAttempts());
 const selectedId = ref("");
@@ -128,9 +128,7 @@ onUnmounted(() => {
 <template>
   <p v-if="!checked">Loading…</p>
 
-  <SignIn v-else-if="!me" lead="Sign in to see your chores.">
-    <PasswordForm />
-  </SignIn>
+  <ResidentSignIn v-else-if="!me" />
 
   <template v-else>
     <header class="site-header">
@@ -152,7 +150,8 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <main class="workspace">
+    <ResidentApp v-if="role === 'resident'" />
+    <main v-else class="workspace">
       <div class="page-heading">
         <div>
           <p class="household"><span class="house-icon" aria-hidden="true"></span> Maple House</p>
