@@ -20,6 +20,12 @@ external Category
 
 external Photo
   A reference to a photo.
+
+opaque RequirementSet
+  A set of requirement strings.
+
+opaque PhotoSet
+  A set of photo references.
 ```
 
 ## State 
@@ -34,33 +40,37 @@ a set of Chores with
   a references set of Photo
   unique name and group
 
-Rule: a chore's category belongs to the same group as the chore
-Rule: a chore's name is nonempty
-Rule: difficulty weights are positive floats bounded in the range [1.0, 10.0] 
+Rule: the composition checks that a chore's category belongs to the same group as the chore
+Rule: a chore's name contains at least one non-whitespace character
+Rule: chore names are compared exactly, including case and surrounding whitespace
+Rule: difficulty weights are finite numbers bounded in the range [1.0, 10.0]
 ```
 
 ## Actions 
 ```actions
-create(group: Group, name: String, description: String, category: Category, difficulty: Number, requirements: set (String), references: set (Photo) ): returns (chore: Chore)
+create(group: Group, name: String, description: String, category: Category, difficulty: Number, requirements: RequirementSet, references: PhotoSet ): returns (chore: Chore)
   where chore with name for group already exists 
   then 
     refuses CHORE_NAME_CONFLICT "Chore with the same name already exists."
   where chore name is invalid according to rules
   then
     refuses CHORE_NAME_INVALID "Chore name is invalid."
-  where chore with name for group doesn't already exist 
-  then 
-    add a new chore with name, description, group, difficulty, requirements, and photo references
+  where difficulty is invalid according to the rules
+  then
+    refuses CHORE_DIFFICULTY_INVALID "Chore difficulty must be in the range [1, 10]."
+  where name and difficulty are valid and name is unused in group
+  then
+    add a new chore with name, description, group, category, difficulty, requirements, and photo references
     returns chore
 
-updateDifficulty(chore: Chore, group: Group, difficulty: number): returns (chore: Chore)
+updateDifficulty(chore: Chore, group: Group, difficulty: Number): returns (chore: Chore)
   where chore doesn't exist in the group catalog
   then 
     refuses CHORE_DOESNT_EXIST "This chore doesn't exist in the catalog."
   where difficulty is invalid according to the rules
   then
     refuses CHORE_DIFFICULTY_INVALID "Chore difficulty must be in the range [1, 10]."
-  where chore exists 
+  where chore exists and difficulty is valid
   then
     update chore difficulty to difficulty
     returns chore
@@ -71,13 +81,16 @@ updateDetails(chore: Chore, group: Group, newCategory: Category, newName: String
     refuses CHORE_DOESNT_EXIST "This chore doesn't exist in the catalog."
   where newName is invalid according to the rules
   then
-    refuse CHORE_NAME_INVALID "Chore name is invalid."
-  where chore exists 
+    refuses CHORE_NAME_INVALID "Chore name is invalid."
+  where another chore in group has newName
+  then
+    refuses CHORE_NAME_CONFLICT "Chore with the same name already exists."
+  where chore exists, newName is valid, and no other chore in group has newName
   then
     update chore name, description, and category
     returns chore
 
-updateRequirements(chore: Chore, group: Group, requirements: set (String) ): returns (chore: Chore)
+updateRequirements(chore: Chore, group: Group, requirements: RequirementSet ): returns (chore: Chore)
   where chore doesn't exist in the group catalog
   then 
     refuses CHORE_DOESNT_EXIST "This chore doesn't exist in the catalog."
@@ -86,7 +99,7 @@ updateRequirements(chore: Chore, group: Group, requirements: set (String) ): ret
     updates chore with new set of requirements
     returns chore
 
-updateReferencePhotos(chore: Chore, group: Group, references: set (Photo) ): returns (chore: Chore)
+updateReferencePhotos(chore: Chore, group: Group, references: PhotoSet ): returns (chore: Chore)
   where chore doesn't exist in the group catalog
   then 
     refuses CHORE_DOESNT_EXIST "This chore doesn't exist in the catalog."
@@ -97,44 +110,22 @@ updateReferencePhotos(chore: Chore, group: Group, references: set (Photo) ): ret
 
 remove(chore: Chore, group: Group): returns (chore: Chore, group: Group)
   where chore doesn't exist in the group catalog
+  then
     refuses CHORE_DOESNT_EXIST "This chore doesn't exist in the catalog."
   where chore exists 
   then
     remove that chore
-    remove all preferences related to that achore
     returns chore, group
 ```
 
 ## Queries 
 ```queries
-_get(chore: Chore) : many (
-  group: Group,
-  name: String,
-  category: Category,
-  difficulty: Number,
-  description: String,
-  requirements: set (String),
-  references: set (Photo)
-)
+_get(chore: Chore) : optional (group: Group, name: String, category: Category, difficulty: Number, description: String, requirements: RequirementSet, references: PhotoSet)
+  Returns the details of the chore if it exists, or no rows if it does not.
 
-_chores(group: Group, sortByDifficulty: Flag) : many (
-  chore: Chore, 
-  name: String, 
-  description: String, 
-  category: Category, 
-  difficulty: Number, 
-  requirements: set (String), 
-  references: set (Photo) 
-)
-  Returns all the chores associated with a given group, in alphabetical order by default, or sorted by ascending difficulty. 
+_chores(group: Group, sortByDifficulty: Flag) : many (chore: Chore, name: String, description: String, category: Category, difficulty: Number, requirements: RequirementSet, references: PhotoSet)
+  Returns all the chores associated with a given group, in alphabetical order by name when sortByDifficulty is false, or by ascending difficulty then name when it is true. Breaks remaining ties by chore identity and returns no rows when none match.
 
-_chores(group: Group, category: Category, sortByDifficulty: Flag) : many (
-  chore: Chore, 
-  name: String, 
-  description: String, 
-  difficulty: Number, 
-  requirements: set (String), 
-  references: set (Photo) 
-)
-  Returns the chores associated with a group and category, in alphabetical order by default, or sorted by ascending difficulty.
+_choresByCategory(group: Group, category: Category, sortByDifficulty: Flag) : many (chore: Chore, name: String, description: String, difficulty: Number, requirements: RequirementSet, references: PhotoSet)
+  Returns the chores associated with a group and category, in alphabetical order by name when sortByDifficulty is false, or by ascending difficulty then name when it is true. Breaks remaining ties by chore identity and returns no rows when none match.
 ```

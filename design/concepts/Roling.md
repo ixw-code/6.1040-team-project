@@ -1,7 +1,11 @@
+# Roling
+
 ## Purpose
 
 Define roles as named sets of capabilities, then give each user at most one role
 within a context.
+
+Copied from Commons.
 
 ## Principle
 
@@ -165,7 +169,3 @@ _denotedRole (ref: String) : one (role: String)
   answers the existing Role denoted by an identifier or exact name
   answers ref itself as the Role when neither matches
 ```
-
-## Note
-
-Copied from Commons.

@@ -8,24 +8,14 @@ export const maxRequestBodyBytes = 1_048_576;
 
 type Sessioning = ReturnType<typeof assembleApplication>["concepts"]["Sessioning"];
 
+import { assignmentHttpErrors } from "./compositions/ChoreAssignments.ts";
+import { householdHttpErrors } from "./compositions/HouseholdManagement.ts";
+
 export const policy = httpPolicy({
   publicOrigin: process.env.PUBLIC_ORIGIN ?? "https://shift-happens.mit-sdg.dev/",
   basePath: "/api",
-  publicErrors: { ...accountsHttp.publicErrors, ...passwordsHttp.publicErrors },
+  publicErrors: { ...accountsHttp.publicErrors, ...passwordsHttp.publicErrors, ...householdHttpErrors, ...assignmentHttpErrors },
   cookies: {
     session: accountsHttp.sessionCookie(sessionCookieName, passwordsHttp.startingSessions),
   },
 });
-
-export function allowsAppOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  return origin === null || origin === policy.publicOrigin;
-}
-
-export async function signedInPerson(request: Request, sessions: Sessioning): Promise<string | undefined> {
-  const cookies = new Bun.CookieMap(request.headers.get("cookie") ?? "");
-  const token = cookies.get(sessionCookieName);
-  if (!token) return;
-  const session = await sessions.use({ session: token as Session });
-  if (!("error" in session)) return session.subject;
-}

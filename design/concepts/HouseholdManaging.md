@@ -17,8 +17,20 @@ As overseer, Alice can update the household and category details or transfer ove
 external Person
   A user who can join a household.
 
-enum PreferenceLevel is PREFER, NEUTRAL, or AVOID
+PreferenceLevel is PREFER or NEUTRAL or AVOID
   How a person feels about a household work category.
+
+opaque PersonSet
+  A set of people.
+
+opaque ResidentRows
+  A set of rows, each with person: Person.
+
+opaque SchedulingPreferences
+  A set of rows, each with person: Person, category: Category, and preferenceLevel: PreferenceLevel.
+
+opaque CategorySet
+  A set of categories.
 ```
 
 
@@ -43,7 +55,8 @@ a set of Preferences with
   a preferenceLevel PreferenceLevel
   unique residency and category
 
-Rule: household and category names are nonempty
+Rule: household and category names contain at least one non-whitespace character
+Rule: category names are compared exactly, including case and surrounding whitespace
 Rule: a household overseer must also be a resident of that household
 Rule: a person can belong to multiple households
 Rule: a person can be an overseer for multiple households
@@ -90,7 +103,7 @@ addResident(household: Household, person: Person) : returns (residency: Residenc
     create a neutral preference for the residency and each household category
     returns residency
 
-removeResident(household: Household, person: Person) : returns (residency: Residency)
+removeResident(household: Household, person: Person) : returns (residency: Residency, household: Household, person: Person)
   where household does not exist
   then
     refuses HOUSEHOLD_NOT_FOUND "This household does not exist."
@@ -103,7 +116,7 @@ removeResident(household: Household, person: Person) : returns (residency: Resid
   where person is a resident and is not the overseer
   then
     remove the residency and associated preferences
-    returns residency
+    returns residency, household, person
 
 setOverseer(household: Household, person: Person) : returns (household: Household)
   where household does not exist
@@ -146,8 +159,7 @@ renameCategory(household: Household, category: Category, name: String) : returns
   where another category with name already belongs to household
   then
     refuses CATEGORY_NAME_CONFLICT "A category with this name already exists."
-  where category belongs to household and name is nonempty
-    and no other category in household has name
+  where category belongs to household and name is nonempty and no other category in household has name
   then
     update the category's name
     returns category
@@ -172,9 +184,13 @@ setPreference(household: Household, person: Person, category: Category, preferen
   where category does not belong to household
   then
     refuses CATEGORY_NOT_FOUND "This category does not belong to the household."
-  otherwise
+  where preferenceLevel is invalid
+  then
+    refuses PREFERENCE_LEVEL_INVALID "Preference level must be PREFER, NEUTRAL, or AVOID."
+  where person is a resident, category belongs to household, and preferenceLevel is valid
+  then
     update the residency's preference level for category
-    returns
+    returns preference
 
 remove(household: Household) : returns (household: Household)
   where household does not exist
@@ -191,18 +207,24 @@ remove(household: Household) : returns (household: Household)
 
 ## Queries
 ```queries
-_household(household: Household) : (name: String, overseer: Person)
-  Return the household details.
+_household(household: Household) : optional (name: String, overseer: Person)
+  Returns the household details, or no rows if the household does not exist.
 
-_householdsByPerson(person: Person) : many (household: Household, name: String, overseer: Person, categories: set of Category)
-  Returns the households that the person is a resident of, in alphabetical order by name.
+_householdsByPerson(person: Person) : many (household: Household, name: String, overseer: Person, categories: CategorySet)
+  Returns the households that the person is a resident of, in alphabetical order by name, breaking ties by household identity. Each row lists categories in alphabetical order by name. Returns no rows if the person belongs to no households.
 
-_categories(household: Household) : many (category: Category)
-  Returns the categories of the household, in alphabetical order.
+_categories(household: Household) : many (category: Category, name: String)
+  Returns the categories of the household, in alphabetical order by name, breaking ties by category identity. Returns no rows if the household is unknown or has no categories.
 
 _residents(household: Household) : many (person: Person)
-  Returns the residents belonging to the household.
+  Returns the residents belonging to the household in the order they joined, or no rows if the household is unknown.
+
+_schedulingInputs(household: Household) : one (people: ResidentRows, preferences: SchedulingPreferences)
+  Returns the residents and their category preferences from the same household state, or two empty sets if the household does not exist.
+
+_allResidents(household: Household, people: PersonSet) : one (all: Flag)
+  Returns whether each supplied person is a resident of the household. Returns true for an empty set and false for a nonempty set when the household is unknown.
 
 _preferences(household: Household, person: Person) : many (category: Category, preferenceLevel: PreferenceLevel)
-  Returns the preference levels for each category for a person in the household.
+  Returns the preference levels for each category for a person in the household, ordered as in _categories. Returns no rows if the household or residency is unknown or there are no categories.
 ```
