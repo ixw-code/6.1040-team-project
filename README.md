@@ -2,6 +2,8 @@
 
 A chore coordination app for shared households.
 
+Demo video: [Watch the resident screens demo](https://drive.google.com/file/d/1RtfwRtwCutBlOyW3axaCPyapHUWt_1ZF/view?usp=sharing)
+
 ## Local setup
 
 Requirements: Bun 1.4.2, Podman, and a Compose provider (`podman compose version`).
