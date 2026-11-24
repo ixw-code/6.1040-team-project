@@ -5,7 +5,15 @@ import type { Preference } from "../types.ts";
 
 const prefs = ref<Preference[] | null>(null);
 const saved = ref("");
-onMounted(async () => { prefs.value = await getPreferences(); });
+const failed = ref(false);
+
+onMounted(async () => {
+  try {
+    prefs.value = await getPreferences();
+  } catch {
+    failed.value = true;
+  }
+});
 
 async function change(pref: Preference, value: string) {
   pref.rating = value === "" ? null : Number(value);
@@ -21,7 +29,8 @@ async function change(pref: Preference, value: string) {
       <p class="rs-body-text">Rate: 1 = least, 10 = most</p>
     </header>
 
-    <p v-if="!prefs" class="rs-status-line rs-hand">Loading…</p>
+    <p v-if="failed" class="rs-status-line rs-hand rs-error">Couldn't load preferences. Try again.</p>
+    <p v-else-if="!prefs" class="rs-status-line rs-hand">Loading…</p>
     <ul v-else class="rs-paper list">
       <li v-for="pref in prefs" :key="pref.choreId" class="row">
         <label :for="`pref-${pref.choreId}`" class="rs-hand chore">{{ pref.chore }}</label>
