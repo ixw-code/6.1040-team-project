@@ -27,7 +27,7 @@
     "check:frontend": "vue-tsc --noEmit -p web/tsconfig.json",
     "start": "NODE_ENV=production bun src/main.ts",
     "check:design": "sync-engine check-design design/concepts/*.md design/types.md design/compositions/*.md",
-    "dev": "bun run db:up && bun scripts/dev.ts",
+    "dev": "bun run db:up && bun run --parallel dev:backend dev:frontend",
     "dev:backend": "NODE_ENV=development bun --watch src/main.ts",
     "dev:frontend": "bun --bun vite --config web/vite.config.ts",
     "build": "bun run check:frontend && bun --bun vite build --config web/vite.config.ts",
