@@ -8,9 +8,10 @@ export default {
   wireName: "ShiftHappensWire",
   design: {
     version: 1,
-    // Register application design documents as their concepts/compositions are implemented.
-    // The setup currently assembles an empty application; design/ contains draft specs.
-    documents: [],
+    documents: [
+      new URL("./design/types.md", import.meta.url),
+      new URL("./design/compositions/Users.md", import.meta.url)
+    ],
   },
   projections: [httpWire({ policy, name: "ShiftHappensWireHttp" })],
 };
