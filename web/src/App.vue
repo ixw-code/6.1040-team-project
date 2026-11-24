@@ -169,9 +169,7 @@ async function saveReview(decision: Decision) {
 <template>
   <p v-if="!checked">Loading…</p>
 
-  <SignIn v-else-if="!me" lead="Sign in to see your chores.">
-    <PasswordForm />
-  </SignIn>
+  <ResidentSignIn v-else-if="!me" />
 
   <template v-else>
     <header class="site-header">
