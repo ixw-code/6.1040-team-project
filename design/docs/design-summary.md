@@ -1,28 +1,36 @@
 # Concepts that make up *Shift Happens*
 
-The concept map shows the original design for *Shift Happens*, including planned concepts such as `Roling`.
+The concept map shows the original design for *Shift Happens*. The core features below describe the Alpha implementation.
 
 ![Concept Map](../attachments/concept-map.png)
 
 ## Core features
 
-Organization is taken care of through the `Households` composition, which uses the `HouseholdManaging` concept, whereby overseers can register and manage their household, and users can register as residents for their households. `HouseholdManaging` keeps track of household data, like its overseer and household work categories, as well as resident data, such as their preferences these categories. Users have the option to submit their own preferences to get assigned chores more comfortable for them, otherwise the defaults wil be used. 
+### Households and the chore catalog
 
-The problem of **unclear assignments** and **uneven responsibilities** within a household are addressed through the `ChoreAssignments` composition. Chores are populated into the `ChoreCataloguing` concept by the Overseer, along with how frequently they need to be done and the overseer's assessment of how preferred that chore is at large. `TaskScheduling` keeps track of users' availabilities, and combines chore categories and resident preferences from `HouseholdManaging` along with the overall list of chores and their difficulty weights from `ChoreCataloguing` in order to determine a fair distribution of chores for the household. While `ChoreCataloguing` manages the canonical list of chores and their requirements, `TaskScheduling` has the responsibility of creating instances of chores as tasks with associated time intervals, assigning them accordingly, and marking their completion. Based on the specific chore type, tasks might float based on deadlines instead of specific intervals.
+An overseer creates a household and adds residents by username. `HouseholdManaging` records membership, the household's overseer, and each resident's preferred order of chores. `ChoreCataloguing` stores reusable chores with a description, an effort rating, completion criteria, and an optional baseline photo that shows residents what their evidence should capture. Each resident ranks a catalog chore once, even when several tasks use it. [Household Management](../compositions/HouseholdManagement.md)
 
-`CompletionChecking` is the composition that primarily addresses the problem of **tedious chore verification**. Given a task and a photo, `PhotoChecking` is used to prompt the Overseer or agent to verify that the chore is in fact completed. (`Reasoning` is how that agent interacts with the `PhotoChecking` concept.)
+### Availability and assignments
 
-After a chore is completed, the assigned user is given a point in `Ranking`. `Ranking` then allows *Shift Happens* to display a leaderboard based on all accumulated points by a user in a household.
+`ChoreAssignments` connects the catalog to `TaskScheduling` to address **unclear assignments** and **uneven workloads**. An overseer creates an assignment for a specific day or a date range and can repeat that window weekly through a chosen end date. A series appears as one assignment in **Manage**. The same resident is assigned to its open occurrences, each with its own submission window and completion record.
 
-In alpha, the overseer runs automatic assignment for a selected week from **Manage → Assign available residents**. A scheduled Sunday-night run is a possible Beta extension.
+Residents mark each weekday Available, Somewhat available, or Not available. For a date range, a resident can qualify on any permitted day. The overseer can choose an assignee or use **Manage → Assign available residents** for the selected week. Automatic assignment tries Available residents first and considers Somewhat available residents when needed. Within each availability level it weighs workload, chore effort, and chore preferences. [Chore Assignments](../compositions/ChoreAssignments.md)
 
-`HouseholdManaging` records household membership and one overseer per household. The compositions use that record to check which actions each person can take. `Roling` is a possible Beta extension for more granular permissions.
+Only the overseer can delete chores or assignments. Deleting a chore hides it from the catalog and preferences while preserving its details for existing tasks. Deleting a weekly assignment removes the series from the schedule and preserves reviewed evidence and credit.
+
+### Evidence review and credit
+
+`CompletionChecking` connects the task to photo evidence so the overseer can verify completion in the app. Its Sync Engine submit reaction verifies the assignment, photo ownership, and that the occurrence's scheduled window is open. `PhotoChecking` saves the submitted photo, criteria, and any baseline used for that attempt. The overseer can approve the photo or reject it with feedback. A resident can resubmit after rejection while the window is open.
+
+On approval, `TaskScheduling` records the original submission time as the completion time. `PhotoChecking` keeps the submission and its separate review time. `Ranking` awards the submitting resident one point per approved occurrence. Overseers can see past decisions in **Reviewed** and household points in **Manage**. [Completion Checking](../compositions/CompletionChecking.md)
+
+## Planned extensions
+
+Possible Beta extensions include opt-in AI review through `Reasoning`, persistent swaps through `Trading`, scheduled weekly runs, and more granular permissions through `Roling`. In Alpha, overseers review evidence, run weekly scheduling, and handle swaps by reassigning tasks.
 
 ## Bonus features
 
 The orange boxes on the concept map represent second-priority features. If the other features are working, we will add:
-
-`Trading` to handle the state of persistent swaps all within the application.
 
 `Reminding` to notify users if the deadline for their chore is approaching and it is still incomplete.
 
@@ -34,4 +42,4 @@ The orange boxes on the concept map represent second-priority features. If the o
 
 # Potential issues
 
-The biggest remaining issue we have is balancing chores of disparate effort, such as when one person may be assigned two chores and others are assigned only one. Depending on how much time the core features end up taking, the weights of a chore that represents how much effort it takes will be adjusted to vary by chore, and `Ranking` and `Scheduling` will consider this when updating and balancing, respectively.
+Two light chores can represent less work than one difficult chore. `TaskScheduling` uses the overseer's effort ratings to balance workload. `Ranking` awards one point per approved task occurrence. User testing can show whether the effort ratings produce a workload residents find fair.
