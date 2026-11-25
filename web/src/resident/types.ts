@@ -42,6 +42,8 @@ export interface Task {
   attempts: Attempt[];
 }
 
+export type TaskDetail = Omit<Task, "start">;
+
 export interface AvailabilityBlock {
   id: string;
   personId: string;

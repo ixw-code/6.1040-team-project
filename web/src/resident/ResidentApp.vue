@@ -37,8 +37,11 @@ const screenKey = computed(() => `${nav.tab.value}:${JSON.stringify(screen.value
         <AvailabilityScreen v-else-if="screen.name === 'availability'" />
         <PreferencesScreen v-else-if="screen.name === 'prefs'" />
         <SwapsScreen v-else-if="screen.name === 'swaps'" />
-        <TaskDetailScreen v-else-if="screen.name === 'task'" :task-id="screen.taskId" />
-        <PhotoPreviewScreen v-else-if="screen.name === 'photo'" :task-id="screen.taskId" :file="screen.file" />
+        <TaskDetailScreen v-else-if="screen.name === 'task'" :task-id="screen.taskId" :calendar-preview="screen.calendarPreview" />
+        <PhotoPreviewScreen
+          v-else-if="screen.name === 'photo'"
+          :task-id="screen.taskId" :file="screen.file" :baseline="screen.baseline" :criteria="screen.criteria"
+        />
         <AttemptScreen v-else-if="screen.name === 'attempt'" :task-id="screen.taskId" :attempt-id="screen.attemptId" />
         <ImageViewerScreen v-else-if="screen.name === 'image'" :url="screen.url" :label="screen.label" />
         <AvailabilityFormScreen v-else-if="screen.name === 'availabilityForm'" />

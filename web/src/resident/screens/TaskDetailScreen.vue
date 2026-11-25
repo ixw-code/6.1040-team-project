@@ -1,36 +1,48 @@
 <script setup lang="ts">
-// Opened from My Tasks (your task) or Calendar (anyone's task, shown for transparency).
-// Your open task → Take Photo. Someone else's open task → Swap Task.
 import { computed, onMounted, ref } from "vue";
+import { useSession } from "../../session.ts";
 import BackLink from "../components/BackLink.vue";
 import PhotoBox from "../components/PhotoBox.vue";
 import { ATTEMPT_BORDER, ATTEMPT_LABEL, formatDate, formatDateTime, isOpen, noteColor, statusText } from "../display.ts";
 import { useNav } from "../nav.ts";
 import { getPeople, getTask } from "../residentApi.ts";
-import type { Person, Task } from "../types.ts";
+import type { Person, TaskDetail } from "../types.ts";
 
-const props = defineProps<{ taskId: string }>();
+const props = defineProps<{ taskId: string; calendarPreview?: TaskDetail }>();
 const nav = useNav();
-const task = ref<Task | null>(null);
+const { me } = useSession();
+const task = ref<TaskDetail | null>(null);
 const people = ref<Person[]>([]);
 const loaded = ref(false);
+const failed = ref(false);
 const camera = ref<HTMLInputElement>();
 
 onMounted(async () => {
-  [task.value, people.value] = await Promise.all([getTask(props.taskId), getPeople()]);
-  loaded.value = true;
+  try {
+    [task.value, people.value] = await Promise.all([
+      props.calendarPreview ?? getTask(props.taskId),
+      getPeople(),
+    ]);
+  } catch {
+    failed.value = true;
+  } finally {
+    loaded.value = true;
+  }
 });
 
 const owner = computed(() => people.value.find((p) => p.id === task.value?.ownerId));
-const mine = computed(() => owner.value?.isMe ?? false);
+const mine = computed(() => Boolean(task.value?.ownerId && task.value.ownerId === me.value?.user));
 const open = computed(() => (task.value ? isOpen(task.value.status) : false));
 const color = computed(() => (task.value ? noteColor(task.value.status, owner.value) : "var(--rs-paper)"));
+const latestFeedback = computed(() => task.value?.status === "redo" ? task.value.attempts[0]?.comment : undefined);
 
 function onPhoto(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
-  if (file && task.value) nav.go({ name: "photo", taskId: task.value.id, file });
+  if (!file || !task.value || !mine.value || !open.value || props.calendarPreview) return;
+  const { id: taskId, references, criteria } = task.value;
+  nav.go({ name: "photo", taskId, file, baseline: references[0] ?? null, criteria });
 }
 </script>
 
@@ -39,7 +51,8 @@ function onPhoto(event: Event) {
     <BackLink />
 
     <p v-if="!loaded" class="rs-status-line rs-hand">Loading…</p>
-    <p v-else-if="!task" class="rs-status-line rs-hand rs-error">This task no longer exists.</p>
+    <p v-else-if="failed" role="alert" class="rs-status-line rs-hand rs-error">Couldn't load this task. Try again.</p>
+    <p v-else-if="!task" class="rs-status-line rs-hand rs-error">This task is no longer available.</p>
 
     <article v-else class="card" :style="{ background: color }">
       <svg class="pin" width="22" height="22" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="var(--rs-pin)" /><circle cx="7" cy="7" r="2.4" fill="#f3a093" /></svg>
@@ -52,50 +65,54 @@ function onPhoto(event: Event) {
         <dt class="rs-heading">Status:</dt>
         <dd class="rs-hand">{{ statusText(task.status, owner) }}</dd>
         <dt class="rs-heading nowrap">Assigned to:</dt>
-        <dd class="rs-hand">{{ mine ? `${owner?.name} (you)` : owner?.name }}</dd>
+        <dd class="rs-hand">{{ mine ? `${me?.username} (you)` : owner?.name ?? "Unassigned" }}</dd>
       </dl>
 
-      <template v-if="open">
-        <!-- Camera only: `capture` opens the rear camera on phones. Desktop browsers ignore it and show a
-             file picker. TODO: decide whether desktop should get getUserMedia capture instead. -->
-        <template v-if="mine">
-          <button type="button" class="rs-pill rs-pill--big rs-heading" @click="camera?.click()">
-            Take Photo
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
-          </button>
-          <input ref="camera" type="file" accept="image/*" capture="environment" hidden @change="onPhoto" />
-        </template>
-        <button v-else type="button" class="rs-pill rs-pill--big rs-heading" @click="nav.go({ name: 'swap', taskId: task.id })">
-          Swap Task
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3" /></svg>
-        </button>
-      </template>
-
-      <section>
-        <h2 class="rs-heading sub">Instructions:</h2>
+      <section v-if="task.instructions">
+        <h2 class="rs-heading sub">Photo instructions</h2>
         <p class="rs-body-text">{{ task.instructions }}</p>
       </section>
-      <section>
-        <h2 class="rs-heading sub">Criteria:</h2>
-        <p class="rs-body-text">{{ task.criteria }}</p>
+      <section v-if="task.criteria">
+        <h2 class="rs-heading sub">Completion criteria</h2>
+        <p class="rs-body-text criteria">{{ task.criteria }}</p>
       </section>
       <section>
-        <h2 class="rs-heading sub">Reference Images:</h2>
-        <div class="thumbs">
+        <h2 class="rs-heading sub">Baseline photo</h2>
+        <p v-if="!task.references.length" class="rs-body-text">No baseline photo was provided.</p>
+        <div v-else class="thumbs">
           <button
             v-for="(url, i) in task.references"
             :key="i"
             type="button"
             class="thumb"
-            :aria-label="`Reference image ${i + 1}, view full screen`"
-            @click="nav.go({ name: 'image', url, label: `Reference image ${i + 1} of ${task.references.length}` })"
+            :aria-label="`Baseline photo ${i + 1}, view full screen`"
+            @click="nav.go({ name: 'image', url, label: 'Baseline photo' })"
           >
-            <PhotoBox :url="url" :label="`Reference image ${i + 1}`" :text="`Ref ${i + 1}`" />
+            <PhotoBox :url="url" label="Baseline photo" text="Baseline photo unavailable" />
           </button>
         </div>
       </section>
-      <section v-if="task.attempts.length">
-        <h2 class="rs-heading sub">Past Attempts:</h2>
+      <section v-if="!calendarPreview && latestFeedback">
+        <h2 class="rs-heading sub">Feedback on your last photo</h2>
+        <p class="rs-body-text">{{ latestFeedback }}</p>
+      </section>
+      <template v-if="open && mine && !calendarPreview">
+        <button type="button" class="rs-pill rs-pill--big rs-heading" @click="camera?.click()">
+          Take Photo
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+        </button>
+        <input ref="camera" type="file" accept="image/*" capture="environment" hidden @change="onPhoto" />
+      </template>
+      <button
+        v-else-if="open && !mine && calendarPreview"
+        type="button" class="rs-pill rs-pill--big rs-heading"
+        @click="nav.go({ name: 'swap', taskId: task.id })"
+      >
+        Swap Task
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3" /></svg>
+      </button>
+      <section v-if="!calendarPreview && task.attempts.length">
+        <h2 class="rs-heading sub">Submission history</h2>
         <div class="thumbs">
           <button
             v-for="a in task.attempts"
@@ -124,6 +141,7 @@ function onPhoto(event: Event) {
 .task-title { margin: 0; font: inherit; }
 .nowrap { white-space: nowrap; }
 .sub { margin: 0 0 4px; font-size: 21px; font-weight: 500; }
+.criteria { white-space: pre-line; }
 .thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 420px; }
 .thumb { display: flex; aspect-ratio: 1; padding: 0; overflow: hidden; border: 2px solid rgba(0, 0, 0, .25); background: none; cursor: pointer; }
 .attempt { display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; background: none; color: var(--rs-ink); text-align: left; font-size: 15px; cursor: pointer; }

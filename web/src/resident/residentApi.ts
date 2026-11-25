@@ -8,12 +8,12 @@
 // These changes are currently in-progress.
 import * as mock from "./mockData.ts";
 import type {
-  Attempt, AvailabilityBlock, AvailabilityChange, Person, Preference, SwapOverview, SwapRequest, Task, TaskStatus,
+  Attempt, AvailabilityBlock, AvailabilityChange, Person, Preference, SwapOverview, SwapRequest, Task, TaskDetail, TaskStatus,
 } from "./types.ts";
 import { api } from "../api.ts";
 import { useSession } from "../session.ts";
 import { colorFor } from "./display.ts";
-import { completionRequest } from "../completion-api.ts";
+import { CompletionRequestError, completionRequest, submissionImage, taskBaselineImage } from "../completion-api.ts";
 
 const delay = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
 const clone = <T>(value: T): T => structuredClone(value);
@@ -32,19 +32,59 @@ export async function getPeople(): Promise<Person[]> {
   }));
 }
 
-type CompletionRow = {
-  completion: {
-    task: { criteria: string };
-    current: { status: string }[];
+const attemptStatus = { PENDING: "pending", APPROVED: "approved", REJECTED: "rejected" } as const;
+type ReviewStatus = keyof typeof attemptStatus;
+type Completion = {
+  task: {
+    task: string; household: string; title: string; assignee: string; photoInstructions: string;
+    criteria: string; baseline: string; dueAt: string; completed: boolean;
   };
+  current: { status: ReviewStatus }[];
+  history: {
+    submission: string; status: ReviewStatus; submittedAt: string; reviewedAt: string | null; feedback: string;
+  }[];
 };
 
-// Maps the backend's time status and latest review onto the four UI statuses.
-function uiStatus(completed: boolean, latest?: { status: string }): TaskStatus {
-  if (completed) return "approved";
-  if (latest?.status === "PENDING") return "submitted";
-  if (latest?.status === "REJECTED") return "redo";
+function uiStatus(completed: boolean, latest?: ReviewStatus): TaskStatus {
+  if (completed || latest === "APPROVED") return "approved";
+  if (latest === "PENDING") return "submitted";
+  if (latest === "REJECTED") return "redo";
   return "todo";
+}
+
+async function readCompletion(task: string): Promise<Completion> {
+  const { completion } = await completionRequest<{ completion: Completion }>("/completion/get", { task });
+  return completion;
+}
+
+/** The assigned task, its photo instructions, and the resident's recorded submissions. */
+export async function getTask(taskId: string): Promise<TaskDetail | null> {
+  const { household, me } = useSession();
+  try {
+    const { task, current, history } = await readCompletion(taskId);
+    if (task.household !== household.value) return null;
+    return {
+      id: task.task,
+      title: task.title,
+      ownerId: task.assignee,
+      due: task.dueAt,
+      status: uiStatus(task.completed, current[0]?.status),
+      instructions: task.photoInstructions,
+      criteria: task.criteria,
+      references: task.baseline && task.assignee === me.value?.user ? [taskBaselineImage(task.task)] : [],
+      attempts: history.map((row): Attempt => ({
+        id: row.submission,
+        photoUrl: submissionImage(row.submission),
+        submittedAt: row.submittedAt,
+        status: attemptStatus[row.status],
+        reviewedAt: row.reviewedAt ?? undefined,
+        comment: row.feedback,
+      })),
+    };
+  } catch (error) {
+    if (error instanceof CompletionRequestError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 /** The signed-in resident's tasks for the current week, for My Tasks. */
@@ -63,11 +103,7 @@ export async function getMyTasks(): Promise<Task[]> {
   if ("error" in result) throw new Error(result.error);
 
   return Promise.all(result.tasks.map(async (row) => {
-    const { completion } = await completionRequest<CompletionRow>(
-      "/completion/get",
-      { task: row.task },
-    );
-    const latest = completion.current[0];
+    const completion = await readCompletion(row.task);
     const completed = row.status === "COMPLETED" || row.status === "COMPLETED_LATE";
 
     return {
@@ -76,7 +112,7 @@ export async function getMyTasks(): Promise<Task[]> {
       ownerId: row.assignee ?? "",
       start: row.interval?.start ?? row.deadline ?? "",
       due: row.interval?.end ?? row.deadline ?? "",
-      status: uiStatus(completed, latest),
+      status: uiStatus(completed, completion.current[0]?.status),
       instructions: row.chore?.description ?? "",
       criteria: completion.task.criteria,
       references: [],
@@ -85,27 +121,41 @@ export async function getMyTasks(): Promise<Task[]> {
   }));
 }
 
-/** One task with its instructions, reference photos and attempts. Works for anyone's task. */
-export async function getTask(taskId: string): Promise<Task | null> {
-  // TODO(backend): TaskScheduling._get(task) + ChoreCataloguing (instructions, criteria, reference photos)
-  // + PhotoChecking attempts for the task.
+/** Task details for the calendar's swap preview. */
+export async function getSwapTask(taskId: string): Promise<Task | null> {
   await delay();
   const task = mock.tasks.find((t) => t.id === taskId);
   return task ? clone(task) : null;
 }
 
-/** Submits a camera photo for a task. The task becomes Submitted. */
-export async function submitPhoto(taskId: string, photo: File): Promise<Attempt> {
-  // TODO(backend): CompletionChecking submit endpoint (multipart upload of `photo`).
-  await delay(300);
-  const task = mock.tasks.find((t) => t.id === taskId);
-  if (!task) throw new Error("Task not found");
-  const attempt: Attempt = {
-    id: `a-${Date.now()}`, photoUrl: URL.createObjectURL(photo), submittedAt: new Date().toISOString(), status: "pending",
-  };
-  task.attempts.push(attempt);
-  task.status = "submitted";
-  return clone(attempt);
+export async function uploadPhoto(file: File): Promise<string> {
+  try {
+    const { photo } = await completionRequest<{ photo: string }>("/photos", file);
+    return photo;
+  } catch (error) {
+    if (error instanceof CompletionRequestError) {
+      if (error.status === 413) throw new Error("The photo is too large. Choose a smaller image.");
+      if (error.status === 400 || error.status === 415) throw new Error("Choose a valid JPEG, PNG, or WebP photo.");
+    }
+    throw new Error("Couldn't upload the photo. Try again.");
+  }
+}
+
+/** Attaches the uploaded photo to the real assignment through the sync-engine endpoint. */
+export async function submitPhoto(task: string, photo: string): Promise<void> {
+  const result = await api.completion.submit({ task, photo });
+  if (!("error" in result)) return;
+  switch (result.error) {
+    case "UNAUTHORIZED":
+      useSession().sessionEnded();
+      throw new Error("Your session ended. Sign in to submit a photo.");
+    case "NOT_FOUND":
+      throw new Error("This task can no longer accept your photo. Return to the task for its latest status.");
+    case "CONFLICT":
+      throw new Error("This task already has a pending or approved photo. Return to the task to see it.");
+    default:
+      throw new Error("Couldn't submit the photo. Try again.");
+  }
 }
 
 /** Everyone's tasks between two times, for the Calendar. */

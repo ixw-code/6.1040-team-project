@@ -57,7 +57,7 @@ const shown = computed(() => tasks.value
           :tilt="tilt(item.id)"
           :label="`${item.title}, ${byId.get(item.ownerId)?.isMe ? 'you' : byId.get(item.ownerId)?.name}, ${timeRange(item.start, item.due)}, ${statusText(item.status, byId.get(item.ownerId))}`"
           class="cal-note"
-          @open="nav.go({ name: 'task', taskId: item.id })"
+          @open="nav.go({ name: 'task', taskId: item.id, calendarPreview: item })"
         >
           <span>{{ item.title }}</span>
           <span>{{ timeRange(item.start, item.due) }}</span>

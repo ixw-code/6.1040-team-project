@@ -26,8 +26,6 @@ onMounted(async () => {
   <section class="rs-screen">
     <header>
       <h1 class="rs-title rs-heading">My Tasks</h1>
-      <!-- TODO(backend): household name from HouseholdManaging._householdsByPerson(me). -->
-      <p class="rs-body-text">Maple House · this week</p>
     </header>
 
     <p v-if="failed" class="rs-status-line rs-hand rs-error">Couldn't load your tasks. Try again.</p>
