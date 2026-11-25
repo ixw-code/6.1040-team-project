@@ -33,12 +33,20 @@ onMounted(reload);
 </script>
 <template>
   <div class="page-heading">
-    <div><p class="household">{{ overseer ? 'Overseer' : 'Resident' }}</p><h1>{{ home.name }}</h1></div>
-    <button class="button button-secondary" @click="reload">Refresh board</button>
+    <div>
+      <p class="household">
+        <span class="house-icon" aria-hidden="true"></span>
+        <span>{{ home.name }} · {{ overseer ? 'Overseer' : 'Resident' }}</span>
+      </p>
+      <h1 v-if="tab !== 'My board'">{{ tab === 'Manage' ? 'Manage household' : tab === 'Settings' ? 'Household settings' : tab }}</h1>
+      <p v-if="tab === 'Review queue'" class="page-description">Compare each submitted photo with the completion criteria and any baseline.</p>
+    </div>
+    <button type="button" class="button button-secondary" @click="reload">Refresh board</button>
   </div>
   <p v-if="error" class="field-error" role="alert">{{ error }}</p>
   <nav class="role-switch board-nav" aria-label="Household sections">
-    <button v-for="item in overseer ? ['Manage', 'Chore catalog', 'Review queue', 'My board', 'Settings'] : ['My board', 'Settings']" :key="item" :aria-pressed="tab === item" @click="tab = item">{{ item }}</button>
+    <button v-for="item in overseer ? ['Manage', 'Chore catalog', 'Review queue', 'My board', 'Settings'] : ['My board', 'Settings']"
+      :key="item" type="button" :aria-pressed="tab === item" @click="tab = item">{{ item }}</button>
   </nav>
   <p v-if="!ready && !error">Loading household…</p>
   <div v-if="ready" :key="version">

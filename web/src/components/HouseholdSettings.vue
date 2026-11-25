@@ -57,28 +57,53 @@ function removeHome() {
 }
 </script>
 <template>
-  <section class="panel alpha-card"><h2>Household settings</h2>
-    <p v-if="error" class="field-error" role="alert">{{ error }}</p><p v-if="message" role="status">{{ message }}</p>
-    <fieldset v-if="manager" class="settings-fields" :disabled="busy">
+  <p v-if="message" class="notice notice-visible" role="status">{{ message }}</p>
+  <p v-if="error" class="field-error" role="alert">{{ error }}</p>
+  <fieldset v-if="manager" class="settings-fields alpha-grid" :disabled="busy">
+    <section class="panel alpha-card" aria-labelledby="household-details">
+      <h2 id="household-details" class="panel-title">Household details</h2>
       <form @submit.prevent="run(() => api.households.rename({ household, name }), 'Household renamed.', true)">
-        <label>Household name<input v-model="name" required maxlength="100"></label><button class="button button-secondary">Rename household</button>
+        <label>Household name<input v-model="name" required maxlength="100"></label>
+        <button class="button button-secondary">Rename household</button>
       </form>
-      <label>Member<select v-model="target"><option value="">Choose resident</option>
-        <option v-for="p in catalog.people.filter(p => p.person !== person)" :key="p.person" :value="p.person">{{ p.username }}</option></select></label>
-      <div class="actions-inline"><button class="button button-secondary" :disabled="!target" @click="transfer">Transfer oversight</button>
-        <button class="button button-secondary" :disabled="!target" @click="removeMember(target)">Remove resident</button></div>
-      <h3>Availability and workload</h3>
-      <ul><li v-for="row in overview" :key="row.person" class="schedule-row">
-        <div><strong>{{ username(row.person) }}</strong> · Assigned effort {{ row.workload }}
-          <ul v-if="row.weeklyAvailability">
-            <li v-for="level in availabilityLevels" :key="level">
-              <strong>{{ availabilityLabels[level] }}</strong> · {{ daysWith(row.weeklyAvailability, level) }}
-            </li>
-          </ul>
-          <p v-else>{{ row.availability.length ? 'Using saved time blocks until weekly availability is set.' : 'No availability saved.' }}</p>
-        </div></li></ul>
-      <button class="button button-secondary" @click="removeHome">Remove unused household</button>
-    </fieldset>
-    <button v-else class="button button-secondary" :disabled="busy" @click="removeMember(person)">Leave household</button>
+      <div class="panel-section">
+        <label>Member
+          <select v-model="target">
+            <option value="">Choose resident</option>
+            <option v-for="p in catalog.people.filter(p => p.person !== person)" :key="p.person" :value="p.person">{{ p.username }}</option>
+          </select>
+        </label>
+        <div class="actions-inline">
+          <button type="button" class="button button-secondary" :disabled="!target" @click="transfer">Transfer oversight</button>
+          <button type="button" class="button button-danger" :disabled="!target" @click="removeMember(target)">Remove resident</button>
+        </div>
+      </div>
+      <div class="panel-section">
+        <button type="button" class="button button-danger" @click="removeHome">Remove unused household</button>
+      </div>
+    </section>
+
+    <section class="panel alpha-card" aria-labelledby="availability-heading">
+      <h2 id="availability-heading" class="panel-title">Availability and workload</h2>
+      <ul class="panel-list">
+        <li v-for="row in overview" :key="row.person" class="workload-entry">
+          <div class="actions-inline">
+            <strong>{{ username(row.person) }}</strong>
+            <span class="status-badge">Assigned effort {{ row.workload }}</span>
+          </div>
+          <dl v-if="row.weeklyAvailability" class="availability-summary">
+            <template v-for="level in availabilityLevels" :key="level">
+              <dt>{{ availabilityLabels[level] }}</dt>
+              <dd>{{ daysWith(row.weeklyAvailability, level) }}</dd>
+            </template>
+          </dl>
+          <p v-else class="panel-copy">{{ row.availability.length ? 'Using saved time blocks until weekly availability is set.' : 'No availability saved.' }}</p>
+        </li>
+      </ul>
+    </section>
+  </fieldset>
+  <section v-else class="panel alpha-card household-form">
+    <h2 class="panel-title">Membership</h2>
+    <button type="button" class="button button-danger" :disabled="busy" @click="removeMember(person)">Leave household</button>
   </section>
 </template>

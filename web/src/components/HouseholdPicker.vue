@@ -30,20 +30,31 @@ const { signOut } = useSession();
 onMounted(() => run(load));
 </script>
 <template>
-  <header class="site-header"><div class="topbar alpha-bar">
-    <div class="brand"><span class="brand-mark"><span class="check-icon"></span></span>Shift Happens</div>
-    <select v-if="homes.length" v-model="selected" aria-label="Household"><option v-for="h in homes" :key="h.household" :value="h.household">{{ h.name }}</option></select>
-    <div class="profile"><strong>{{ username }}</strong><button class="button button-secondary" @click="run(signOut)">Sign out</button></div>
-  </div></header>
-  <main class="workspace">
-    <p v-if="error" class="field-error" role="alert">{{ error }}</p>
-    <div class="actions-inline">
-      <button v-if="homes.length" class="button button-link" @click="creating = !creating">{{ creating ? 'Cancel' : 'New household' }}</button>
-      <button class="button button-link" :disabled="busy" @click="run(load)">Refresh households</button>
+  <header class="site-header">
+    <div class="topbar household-topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><span class="check-icon"></span></span>
+        <span>Shift Happens</span>
+      </div>
+      <select v-if="homes.length" v-model="selected" class="household-switch" aria-label="Household" :disabled="busy">
+        <option v-for="h in homes" :key="h.household" :value="h.household">{{ h.name }}</option>
+      </select>
+      <div class="profile">
+        <span class="profile-name">{{ username }}</span>
+        <span class="avatar profile-avatar" aria-hidden="true">{{ username.slice(0, 2).toUpperCase() }}</span>
+        <button type="button" class="button button-secondary" :disabled="busy" @click="run(signOut)">Sign out</button>
+      </div>
     </div>
-    <form v-if="creating || !home" class="panel alpha-card" @submit.prevent="run(create)">
-      <h1>{{ home ? 'New household' : 'Your households' }}</h1>
-      <p v-if="!home">Create a household to be its overseer, or give your username to your overseer and refresh after they add you.</p>
+  </header>
+  <main class="workspace household-workspace">
+    <p v-if="error" class="field-error" role="alert">{{ error }}</p>
+    <div class="actions-inline household-actions">
+      <button v-if="homes.length" type="button" class="button button-link" :disabled="busy" @click="creating = !creating">{{ creating ? 'Cancel' : 'New household' }}</button>
+      <button type="button" class="button button-link" :disabled="busy" @click="run(load)">Refresh households</button>
+    </div>
+    <form v-if="creating || !home" class="panel alpha-card household-form" @submit.prevent="run(create)">
+      <h1 class="panel-title">{{ home ? 'New household' : 'Your households' }}</h1>
+      <p v-if="!home" class="panel-copy">Create a household to be its overseer, or give your username to your overseer and refresh after they add you.</p>
       <label>Household name<input v-model="name" required maxlength="100"></label>
       <button class="button button-primary" :disabled="busy">Create household</button>
     </form>

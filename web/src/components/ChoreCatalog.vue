@@ -110,9 +110,9 @@ async function addTask() {
     </div>
     <p v-if="error" class="field-error" role="alert">{{ error }}</p>
     <div class="alpha-grid">
-      <section class="panel alpha-card" aria-labelledby="chore-catalog">
-        <h2 id="chore-catalog">Chore catalog</h2>
-        <p>Save each responsibility once. Residents rank the chores in this catalog.</p>
+      <section class="panel alpha-card" aria-label="Chore catalog">
+        <h2 class="panel-title">Add chore</h2>
+        <p class="panel-copy">Residents rank the chores in this catalog.</p>
         <form @submit.prevent="run(addChore)">
           <label>Chore name<input v-model="title" required maxlength="150"></label>
           <label>Description and photo instructions<textarea v-model="instructions" required maxlength="4000"></textarea></label>
@@ -123,20 +123,27 @@ async function addTask() {
           </label>
           <button class="button button-primary" :disabled="busy">Save chore</button>
         </form>
-        <ul v-if="catalog.chores.length" class="catalog-chores">
-          <li v-for="item in catalog.chores" :key="item.chore">
-            <div>
-              <strong>{{ item.name }}</strong>
-              <p>{{ item.description }}</p>
-            </div>
-            <button type="button" class="button button-delete" :disabled="busy"
-              :aria-label="`Delete chore ${item.name}`" @click="deleteChore(item)">Delete chore</button>
-          </li>
-        </ul>
-        <p v-else>No chores yet.</p>
+        <section class="panel-section" aria-labelledby="saved-chores">
+          <h3 id="saved-chores">Saved chores</h3>
+          <ul v-if="catalog.chores.length" class="panel-list catalog-chores">
+            <li v-for="item in catalog.chores" :key="item.chore" class="schedule-row">
+              <div>
+                <div class="actions-inline">
+                  <strong>{{ item.name }}</strong>
+                  <span class="status-badge">Effort {{ item.difficulty }}/10</span>
+                </div>
+                <p class="panel-copy">{{ item.description }}</p>
+              </div>
+              <button type="button" class="button button-danger" :disabled="busy"
+                :aria-label="`Delete chore ${item.name}`" @click="deleteChore(item)">Delete chore</button>
+            </li>
+          </ul>
+          <p v-else class="panel-copy">No chores yet.</p>
+        </section>
       </section>
-      <form class="panel alpha-card" @submit.prevent="run(addTask)"><h2>Create assignment</h2>
-        <p>Create an assignment from a catalog chore, then choose the resident in Manage.</p>
+      <form class="panel alpha-card" @submit.prevent="run(addTask)">
+        <h2 class="panel-title">Create assignment</h2>
+        <p class="panel-copy">Choose a chore and set its dates. Assign a resident in Manage.</p>
         <label>Catalog chore<select v-model="chore" required><option disabled value="">Choose chore</option><option v-for="c in catalog.chores" :key="c.chore" :value="c.chore">{{ c.name }}</option></select></label>
         <fieldset class="assignment-timing" :disabled="busy">
           <div class="assignment-field">
@@ -181,8 +188,6 @@ async function addTask() {
 .assignment-timing { min-width: 0; margin: 0; padding: 0; border: 0; display: grid; gap: 1rem; }
 .assignment-field { display: grid; gap: .3rem; }
 .assignment-pair { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
-.assignment-hint { color: var(--muted); font-size: .875rem; }
-.catalog-chores { display: grid; gap: .5rem; }
-.catalog-chores li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: .5rem; border-bottom: 1px solid var(--line); padding-bottom: .5rem; overflow-wrap: anywhere; }
-.catalog-chores p { color: var(--muted); white-space: pre-wrap; }
+.assignment-hint { color: var(--dark-green); background: var(--green-light); border-radius: .7rem; padding: .7rem .85rem; font-size: .875rem; }
+.catalog-chores p { white-space: pre-wrap; }
 </style>
