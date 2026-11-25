@@ -280,6 +280,9 @@ Defined in [TaskScheduling](../design/concepts/TaskScheduling.md), line 1.
 
 - `_assignments(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, weekly: Flag, occurrences: Number, remaining: Number, mixed: Flag, assignee: Person, startsAt: DateTime, firstWindowEndsAt: DateTime, endsAt: DateTime, flexibleDays: Flag, timeZone: String)`
 - `_get(task: Task) : optional (group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime, archived?: Flag, timeZone?: String, flexibleDays?: Flag)`
+- `_completionContext(task: Task) : optional (group: Group, item: Item, assignee?: Person, dueAt: DateTime, completion: CompletionState, interval?: Interval, archived?: Flag)`
+- `_status(task: Task, asOf: DateTime) : optional (status: Status)`
+- `_incomplete(task: Task) : optional (group: Group)`
 - `_activeTask(task: Task) : optional (group: Group)`
 - `_tasks(group: Group) : many (task: Task, item: Item, category?: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)`
 - `_schedule(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, category?: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)`
@@ -309,15 +312,13 @@ Concrete types:
 
 ## Computations
 
-- `activeChorePreferences(chorePreferences: ChorePreferences, items: ChoreSet) : ChorePreferenceSet` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 127.
-- `assignmentCategory(category?: Category) : CategorySelection` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 129.
-- `assignmentDate(value: String) : DateTime` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 131.
-- `assignmentInterval(value: IntervalInput) : Interval` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 133.
-- `assignmentIsIncomplete(completedAt?: DateTime) : IncompleteMatch` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 141.
-- `assignmentPeople(entries: ScheduleEntries) : People` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 135.
-- `assignmentStatus(deadline?: DateTime, interval?: Interval, completedAt?: DateTime, asOf: DateTime) : String` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 139.
-- `availabilityWindows(windows: IntervalInputs) : IntervalSet` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 125.
-- `matchesPersonalTask(person: String, assignee?: String, completedBy?: String, mode: String) : TaskMatch` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 137.
+- `activeChorePreferences(chorePreferences: ChorePreferences, items: ChoreSet) : ChorePreferenceSet` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 129.
+- `assignmentCategory(category?: Category) : CategorySelection` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 131.
+- `assignmentDate(value: String) : DateTime` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 133.
+- `assignmentInterval(value: IntervalInput) : Interval` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 135.
+- `assignmentPeople(entries: ScheduleEntries) : People` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 137.
+- `availabilityWindows(windows: IntervalInputs) : IntervalSet` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 127.
+- `matchesPersonalTask(person: String, assignee?: String, completedBy?: String, mode: String) : TaskMatch` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 139.
 
 ## Views
 
@@ -342,7 +343,7 @@ Authored path: `ChoreAssignments.ValidHouseholdChore`.
 ### (requester) lives in (household)
 
 Authored path: `ChoreAssignments.CanReadSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
 
 ```view
 (requester) lives in (household) — inputs (requester, household); outputs (); bindings ()
@@ -366,9 +367,9 @@ Authored path: `HouseholdManagement.CanEditPreference`.
 
 Authored path: `ChoreAssignments.CanManageSchedule`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 39.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 78.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 64.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 80.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
 
 ```view
 (requester) oversees (household) — inputs (requester, household); outputs (); bindings ()
@@ -378,7 +379,7 @@ Authored path: `ChoreAssignments.CanManageSchedule`.
 ### (requester) may remove (person) from (household)
 
 Authored path: `HouseholdManagement.CanRemoveResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
 
 ```view
 (requester) may remove (person) from (household) — inputs (requester, person, household); outputs (); bindings ()
@@ -416,7 +417,7 @@ Authored path: `ChoreAssignments.CanEditAvailability`.
 ### (requester) may read scheduling details for (person) in (household)
 
 Authored path: `ChoreAssignments.CanReadHouseholdDetails`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
 
 ```view
 (requester) may read scheduling details for (person) in (household) — inputs (requester, person, household); outputs (); bindings ()
@@ -426,20 +427,17 @@ Authored path: `ChoreAssignments.CanReadHouseholdDetails`.
 ### (task) is an incomplete task in (household)
 
 Authored path: `ChoreAssignments.AssignmentIsModifiable`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
 
 ```view
-(task) is an incomplete task in (household) — inputs (task, household); outputs (); bindings (completedAt)
-  where
-    TaskScheduling._activeTask (task) has (group: household)
-    whether TaskScheduling._get (task) has (completedAt)
-    (incomplete: true) is assignmentIsIncomplete (completedAt)
+(task) is an incomplete task in (household) — inputs (task, household); outputs (); bindings ()
+  where TaskScheduling._incomplete (task) has (group: household)
 ```
 
 ### (task) matches (mode) for (person)
 
 Authored path: `ChoreAssignments.PersonalTaskMatches`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
 
 ```view
 (task) matches (mode) for (person) — inputs (task, person, mode); outputs (); bindings (assignee, completedBy)
@@ -457,7 +455,7 @@ _the authored explanation; this section records the generated shape._
 ### availability for (person) in (household)
 
 Authored path: `ChoreAssignments.PersonAvailability`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
 
 ```former
 Former "availability for (person) in (household)" — inputs (household, person); bindings (availability, interval); promises exactly one record — forms:
@@ -470,7 +468,7 @@ Former "availability for (person) in (household)" — inputs (household, person)
 ### the details of the catalogue (item) in (household)
 
 Authored path: `ChoreAssignments.ChoreDetails`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
 
 ```former
 Former "the details of the catalogue (item) in (household)" — inputs (item, household); bindings (name, description, requirements, references); promises at most one record — forms:
@@ -485,7 +483,7 @@ Former "the details of the catalogue (item) in (household)" — inputs (item, ho
 ### the display details of (task) in (household) at (asOf)
 
 Authored path: `ChoreAssignments.ScheduleTaskDetails`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
 
 ```former
 Former "the display details of (task) in (household) at (asOf)" — inputs (task, household, asOf); bindings (item, category, name, deadline, interval, flexibleDays, assignee, source, completedAt, completedBy, weight, status); promises exactly one record — forms:
@@ -498,7 +496,7 @@ Former "the display details of (task) in (household) at (asOf)" — inputs (task
     where whether TaskScheduling._get (task) has (flexibleDays)
     where whether TaskScheduling._get (task) has (assignee, source)
     where whether TaskScheduling._get (task) has (completedAt, completedBy)
-    where status is assignmentStatus (asOf, completedAt, deadline, interval)
+    where TaskScheduling._status (asOf, task) has (status)
     assignee
     category
     categoryName: the name of the first HouseholdManaging._categories (household) has (category, name)
@@ -518,7 +516,7 @@ Former "the display details of (task) in (household) at (asOf)" — inputs (task
 ### the (mode) tasks of (person) in (household) from (from) until (until) at (asOf)
 
 Authored path: `ChoreAssignments.MyTasks`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
 
 ```former
 Former "the (mode) tasks of (person) in (household) from (from) until (until) at (asOf)" — inputs (household, from, until, asOf, person, mode); bindings (task); promises exactly one record — forms:
@@ -531,7 +529,7 @@ Former "the (mode) tasks of (person) in (household) from (from) until (until) at
 ### the assignments of (household) from (from) until (until)
 
 Authored path: `ChoreAssignments.AssignmentList`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 94.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
 
 ```former
 Former "the assignments of (household) from (from) until (until)" — inputs (household, from, until); bindings (task, item, weekly, occurrences, remaining, mixed, assignee, startsAt, firstWindowEndsAt, endsAt, flexibleDays, timeZone); promises exactly one record — forms:
@@ -617,7 +615,7 @@ Former "the preferences of (person) in (household)" — inputs (household, perso
 ### the recurring availability of (person) in (household)
 
 Authored path: `ChoreAssignments.PersonWeeklyAvailability`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
 
 ```former
 Former "the recurring availability of (person) in (household)" — inputs (household, person); bindings (days); promises exactly one record — forms:
@@ -632,17 +630,19 @@ Authored path: `HouseholdManagement.HouseholdResidents`.
 - Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 83.
 
 ```former
-Former "the residents of (household)" — inputs (household); bindings (person); promises exactly one record — forms:
+Former "the residents of (household)" — inputs (household); bindings (person, username); promises exactly one record — forms:
   each HouseholdManaging._residents (household) has (person)
+    where whether Registering._username (user: person) has (username)
     form a record of
       person
+      username
 ```
 
 ### the schedule of (household) from (from) until (until) at (asOf)
 
 Authored path: `ChoreAssignments.HouseholdSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 76.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 78.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
 
 ```former
 Former "the schedule of (household) from (from) until (until) at (asOf)" — inputs (household, from, until, asOf); bindings (task); promises exactly one record — forms:
@@ -654,7 +654,7 @@ Former "the schedule of (household) from (from) until (until) at (asOf)" — inp
 ### the scheduling preferences of (person) in (household)
 
 Authored path: `ChoreAssignments.HouseholdPreferences`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
 
 ```former
 Former "the scheduling preferences of (person) in (household)" — inputs (household, person); bindings (category, preferenceLevel); promises exactly one record — forms:
@@ -667,7 +667,7 @@ Former "the scheduling preferences of (person) in (household)" — inputs (house
 ### the workload of (person) in (household)
 
 Authored path: `ChoreAssignments.ResidentWorkload`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
 
 ```former
 Former "the workload of (person) in (household)" — inputs (household, person); bindings (workload); promises exactly one record — forms:
@@ -679,7 +679,7 @@ Former "the workload of (person) in (household)" — inputs (household, person);
 ### the scheduling overview of (household)
 
 Authored path: `ChoreAssignments.HouseholdOverview`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
 
 ```former
 Former "the scheduling overview of (household)" — inputs (household); bindings (person); promises exactly one record — forms:
@@ -789,8 +789,8 @@ then
 ### ChoreAssignments.AutoSchedule
 
 Authored path: `ChoreAssignments.AutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 69.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 64.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
 
 ```reaction
 when RequestBoundary.request (from, household, onlyUnassigned, path: "/assignments/auto-schedule", requestId, session, until)
@@ -801,8 +801,8 @@ then
 ### ChoreAssignments.AutoSchedule:denied#2
 
 Authored path: `ChoreAssignments.AutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 69.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 64.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.AutoSchedule
@@ -817,8 +817,8 @@ then
 ### ChoreAssignments.AutoSchedule:missingHousehold#2
 
 Authored path: `ChoreAssignments.AutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 69.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 64.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.AutoSchedule
@@ -832,8 +832,8 @@ then
 ### ChoreAssignments.AutoSchedule:scheduled#2
 
 Authored path: `ChoreAssignments.AutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 69.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 64.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.AutoSchedule
@@ -852,8 +852,8 @@ then
 ### ChoreAssignments.AutoSchedule:scheduled#3
 
 Authored path: `ChoreAssignments.AutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 69.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 64.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
 
 ```reaction
 when TaskScheduling.autoSchedule (chorePreferences: usablePreferences, from: fromDate, group: household, onlyUnassigned, people, preferences, until: untilDate, scheduled, unassigned), asked by ChoreAssignments.AutoSchedule:scheduled#2
@@ -867,7 +867,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTask`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 41.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 50.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
 
 ```reaction
 when RequestBoundary.request (chore, deadline, household, interval, path: "/assignments/tasks/create", requestId, session)
@@ -879,7 +879,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTask`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 41.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 50.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTask
@@ -897,7 +897,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTask`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 41.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 50.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
 
 ```reaction
 when TaskScheduling.add (category, deadline: due, group: household, interval: scheduledInterval, item: chore, weight, task), asked by ChoreAssignments.CreateTask:created#2
@@ -911,7 +911,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTask`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 41.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 50.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTask
@@ -927,7 +927,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTask`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 41.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 50.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTask
@@ -943,7 +943,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTask`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 41.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 50.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTask
@@ -958,7 +958,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTaskBatch`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 43.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 51.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
 
 ```reaction
 when RequestBoundary.request (batchId, chore, flexibleDays, household, path: "/assignments/tasks/create-batch", repeatWeekly, requestId, session, timeZone, windows)
@@ -970,7 +970,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTaskBatch`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 43.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 51.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTaskBatch
@@ -987,7 +987,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTaskBatch`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 43.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 51.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
 
 ```reaction
 when TaskScheduling.addBatch (batchId, category, flexibleDays, group: household, intervals, item: chore, repeatWeekly, timeZone, weight, tasks), asked by ChoreAssignments.CreateTaskBatch:created#2
@@ -1001,7 +1001,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTaskBatch`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 43.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 51.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTaskBatch
@@ -1017,7 +1017,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTaskBatch`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 43.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 51.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTaskBatch
@@ -1033,7 +1033,7 @@ then
 
 Authored path: `ChoreAssignments.CreateTaskBatch`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 43.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 51.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.CreateTaskBatch
@@ -1048,7 +1048,7 @@ then
 
 Authored path: `ChoreAssignments.DeleteAssignment`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
 
 ```reaction
 when RequestBoundary.request (household, path: "/assignments/tasks/delete", requestId, session, task)
@@ -1060,7 +1060,7 @@ then
 
 Authored path: `ChoreAssignments.DeleteAssignment`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.DeleteAssignment
@@ -1075,7 +1075,7 @@ then
 
 Authored path: `ChoreAssignments.DeleteAssignment`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
 
 ```reaction
 when TaskScheduling.archiveAssignment (group: household, task), asked by ChoreAssignments.DeleteAssignment:deleted#2
@@ -1089,7 +1089,7 @@ then
 
 Authored path: `ChoreAssignments.DeleteAssignment`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.DeleteAssignment
@@ -1105,7 +1105,7 @@ then
 
 Authored path: `ChoreAssignments.DeleteAssignment`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 53.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.DeleteAssignment
@@ -1120,7 +1120,7 @@ then
 
 Authored path: `ChoreAssignments.EditAvailability`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 32.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 116.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 118.
 
 ```reaction
 when RequestBoundary.request (adding, household, path: "/assignments/availability/edit", requestId, session, windows)
@@ -1132,7 +1132,7 @@ then
 
 Authored path: `ChoreAssignments.EditAvailability`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 32.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 116.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 118.
 
 ```reaction
 when Sessioning.use (session, subject: person), asked by ChoreAssignments.EditAvailability
@@ -1148,7 +1148,7 @@ then
 
 Authored path: `ChoreAssignments.EditAvailability`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 32.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 116.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 118.
 
 ```reaction
 when Sessioning.use (session, subject: person), asked by ChoreAssignments.EditAvailability
@@ -1164,7 +1164,7 @@ then
 
 Authored path: `ChoreAssignments.EditAvailability`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 32.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 116.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 118.
 
 ```reaction
 when TaskScheduling.editAvailability (adding, group: household, person, windows: intervals, freed), asked by ChoreAssignments.EditAvailability:edited#2
@@ -1178,7 +1178,7 @@ then
 
 Authored path: `ChoreAssignments.EditAvailability`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 32.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 116.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 118.
 
 ```reaction
 when Sessioning.use (session, subject: person), asked by ChoreAssignments.EditAvailability
@@ -1192,8 +1192,8 @@ then
 ### ChoreAssignments.GetAssignments
 
 Authored path: `ChoreAssignments.GetAssignments`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 94.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 107.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
 
 ```reaction
 when RequestBoundary.request (from, household, path: "/assignments/list", requestId, session, until)
@@ -1204,8 +1204,8 @@ then
 ### ChoreAssignments.GetAssignments:assignments#2
 
 Authored path: `ChoreAssignments.GetAssignments`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 94.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 107.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetAssignments
@@ -1222,8 +1222,8 @@ then
 ### ChoreAssignments.GetAssignments:denied#2
 
 Authored path: `ChoreAssignments.GetAssignments`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 94.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 107.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetAssignments
@@ -1238,8 +1238,8 @@ then
 ### ChoreAssignments.GetAssignments:invalidWindow#2
 
 Authored path: `ChoreAssignments.GetAssignments`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 94.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 107.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetAssignments
@@ -1256,8 +1256,8 @@ then
 ### ChoreAssignments.GetAssignments:missingHousehold#2
 
 Authored path: `ChoreAssignments.GetAssignments`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 94.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 107.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetAssignments
@@ -1271,8 +1271,8 @@ then
 ### ChoreAssignments.GetAvailability
 
 Authored path: `ChoreAssignments.GetAvailability`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 114.
 
 ```reaction
 when RequestBoundary.request (household, path: "/assignments/availability", person, requestId, session)
@@ -1283,8 +1283,8 @@ then
 ### ChoreAssignments.GetAvailability:availability#2
 
 Authored path: `ChoreAssignments.GetAvailability`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetAvailability
@@ -1299,8 +1299,8 @@ then
 ### ChoreAssignments.GetAvailability:denied#2
 
 Authored path: `ChoreAssignments.GetAvailability`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetAvailability
@@ -1315,8 +1315,8 @@ then
 ### ChoreAssignments.GetAvailability:missingHousehold#2
 
 Authored path: `ChoreAssignments.GetAvailability`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetAvailability
@@ -1330,8 +1330,8 @@ then
 ### ChoreAssignments.GetAvailability:missingResident#2
 
 Authored path: `ChoreAssignments.GetAvailability`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetAvailability
@@ -1347,8 +1347,8 @@ then
 ### ChoreAssignments.GetHouseholdOverview
 
 Authored path: `ChoreAssignments.GetHouseholdOverview`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 113.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 115.
 
 ```reaction
 when RequestBoundary.request (household, path: "/assignments/overview", requestId, session)
@@ -1359,8 +1359,8 @@ then
 ### ChoreAssignments.GetHouseholdOverview:denied#2
 
 Authored path: `ChoreAssignments.GetHouseholdOverview`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 113.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetHouseholdOverview
@@ -1375,8 +1375,8 @@ then
 ### ChoreAssignments.GetHouseholdOverview:missingHousehold#2
 
 Authored path: `ChoreAssignments.GetHouseholdOverview`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 113.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetHouseholdOverview
@@ -1390,8 +1390,8 @@ then
 ### ChoreAssignments.GetHouseholdOverview:overview#2
 
 Authored path: `ChoreAssignments.GetHouseholdOverview`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 113.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetHouseholdOverview
@@ -1405,8 +1405,8 @@ then
 ### ChoreAssignments.GetMyTasks
 
 Authored path: `ChoreAssignments.GetMyTasks`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
 
 ```reaction
 when RequestBoundary.request (from, household, mode, path: "/assignments/mine", requestId, session, until)
@@ -1417,8 +1417,8 @@ then
 ### ChoreAssignments.GetMyTasks:denied#2
 
 Authored path: `ChoreAssignments.GetMyTasks`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetMyTasks
@@ -1433,8 +1433,8 @@ then
 ### ChoreAssignments.GetMyTasks:invalidWindow#2
 
 Authored path: `ChoreAssignments.GetMyTasks`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetMyTasks
@@ -1451,8 +1451,8 @@ then
 ### ChoreAssignments.GetMyTasks:missingHousehold#2
 
 Authored path: `ChoreAssignments.GetMyTasks`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetMyTasks
@@ -1466,8 +1466,8 @@ then
 ### ChoreAssignments.GetMyTasks:tasks#2
 
 Authored path: `ChoreAssignments.GetMyTasks`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 100.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 112.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetMyTasks
@@ -1485,8 +1485,8 @@ then
 ### ChoreAssignments.GetSchedule
 
 Authored path: `ChoreAssignments.GetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
 
 ```reaction
 when RequestBoundary.request (from, household, path: "/assignments/schedule", requestId, session, until)
@@ -1497,8 +1497,8 @@ then
 ### ChoreAssignments.GetSchedule:denied#2
 
 Authored path: `ChoreAssignments.GetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetSchedule
@@ -1513,8 +1513,8 @@ then
 ### ChoreAssignments.GetSchedule:invalidWindow#2
 
 Authored path: `ChoreAssignments.GetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetSchedule
@@ -1531,8 +1531,8 @@ then
 ### ChoreAssignments.GetSchedule:missingHousehold#2
 
 Authored path: `ChoreAssignments.GetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetSchedule
@@ -1546,8 +1546,8 @@ then
 ### ChoreAssignments.GetSchedule:schedule#2
 
 Authored path: `ChoreAssignments.GetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 109.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetSchedule
@@ -1565,8 +1565,8 @@ then
 ### ChoreAssignments.GetTask
 
 Authored path: `ChoreAssignments.GetTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 108.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
 
 ```reaction
 when RequestBoundary.request (household, path: "/assignments/task", requestId, session, task)
@@ -1577,8 +1577,8 @@ then
 ### ChoreAssignments.GetTask:denied#2
 
 Authored path: `ChoreAssignments.GetTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 108.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetTask
@@ -1593,8 +1593,8 @@ then
 ### ChoreAssignments.GetTask:missingHousehold#2
 
 Authored path: `ChoreAssignments.GetTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 108.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetTask
@@ -1608,8 +1608,8 @@ then
 ### ChoreAssignments.GetTask:missingTask#2
 
 Authored path: `ChoreAssignments.GetTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 108.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetTask
@@ -1624,8 +1624,8 @@ then
 ### ChoreAssignments.GetTask:task#2
 
 Authored path: `ChoreAssignments.GetTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 96.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 108.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 98.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 110.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetTask
@@ -1641,8 +1641,8 @@ then
 ### ChoreAssignments.GetTotal
 
 Authored path: `ChoreAssignments.GetTotal`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 113.
 
 ```reaction
 when RequestBoundary.request (household, path: "/assignments/total", person, requestId, session)
@@ -1653,8 +1653,8 @@ then
 ### ChoreAssignments.GetTotal:denied#2
 
 Authored path: `ChoreAssignments.GetTotal`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 113.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetTotal
@@ -1669,8 +1669,8 @@ then
 ### ChoreAssignments.GetTotal:missingHousehold#2
 
 Authored path: `ChoreAssignments.GetTotal`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 113.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetTotal
@@ -1684,8 +1684,8 @@ then
 ### ChoreAssignments.GetTotal:missingResident#2
 
 Authored path: `ChoreAssignments.GetTotal`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 113.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetTotal
@@ -1701,8 +1701,8 @@ then
 ### ChoreAssignments.GetTotal:total#2
 
 Authored path: `ChoreAssignments.GetTotal`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 102.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 111.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 104.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 113.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.GetTotal
@@ -1903,8 +1903,8 @@ then
 ### ChoreAssignments.RemoveTask
 
 Authored path: `ChoreAssignments.RemoveTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
 
 ```reaction
 when RequestBoundary.request (household, path: "/assignments/tasks/remove", requestId, session, task)
@@ -1915,8 +1915,8 @@ then
 ### ChoreAssignments.RemoveTask:changed#2
 
 Authored path: `ChoreAssignments.RemoveTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RemoveTask
@@ -1931,8 +1931,8 @@ then
 ### ChoreAssignments.RemoveTask:changed#3
 
 Authored path: `ChoreAssignments.RemoveTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
 
 ```reaction
 when TaskScheduling.remove (task), asked by ChoreAssignments.RemoveTask:changed#2
@@ -1945,8 +1945,8 @@ then
 ### ChoreAssignments.RemoveTask:completedTask#2
 
 Authored path: `ChoreAssignments.RemoveTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RemoveTask
@@ -1962,8 +1962,8 @@ then
 ### ChoreAssignments.RemoveTask:denied#2
 
 Authored path: `ChoreAssignments.RemoveTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RemoveTask
@@ -1978,8 +1978,8 @@ then
 ### ChoreAssignments.RemoveTask:missingHousehold#2
 
 Authored path: `ChoreAssignments.RemoveTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RemoveTask
@@ -1993,8 +1993,8 @@ then
 ### ChoreAssignments.RemoveTask:missingTask#2
 
 Authored path: `ChoreAssignments.RemoveTask`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 52.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RemoveTask
@@ -2009,8 +2009,8 @@ then
 ### ChoreAssignments.Reset
 
 Authored path: `ChoreAssignments.Reset`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 66.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 68.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 73.
 
 ```reaction
 when RequestBoundary.request (from, household, path: "/assignments/reset", requestId, session, until)
@@ -2021,8 +2021,8 @@ then
 ### ChoreAssignments.Reset:denied#2
 
 Authored path: `ChoreAssignments.Reset`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 66.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 68.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 73.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.Reset
@@ -2037,8 +2037,8 @@ then
 ### ChoreAssignments.Reset:missingHousehold#2
 
 Authored path: `ChoreAssignments.Reset`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 66.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 68.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 73.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.Reset
@@ -2052,8 +2052,8 @@ then
 ### ChoreAssignments.Reset:reset#2
 
 Authored path: `ChoreAssignments.Reset`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 66.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 68.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 73.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.Reset
@@ -2069,8 +2069,8 @@ then
 ### ChoreAssignments.Reset:reset#3
 
 Authored path: `ChoreAssignments.Reset`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 66.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 71.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 68.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 73.
 
 ```reaction
 when TaskScheduling.reset (from: fromDate, group: household, until: untilDate, cleared), asked by ChoreAssignments.Reset:reset#2
@@ -2084,7 +2084,7 @@ then
 
 Authored path: `ChoreAssignments.ResidentRemoved`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 11.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 25.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when HouseholdManaging.removeResident (household, person)
@@ -2099,7 +2099,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 25.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when RequestBoundary.request (household, path: "/assignments/residents/cleanup", person, requestId, session)
@@ -2112,7 +2112,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 25.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RetryResidentCleanup
@@ -2129,7 +2129,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 25.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when TaskScheduling.removePerson (group: household, person, freed), asked by ChoreAssignments.RetryResidentCleanup:cleaned#2
@@ -2144,7 +2144,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 25.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RetryResidentCleanup
@@ -2161,7 +2161,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 25.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RetryResidentCleanup
@@ -2177,7 +2177,7 @@ then
 Authored path: `ChoreAssignments.RetryResidentCleanup`.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 13.
 - Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 16.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 25.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.RetryResidentCleanup
@@ -2192,8 +2192,8 @@ then
 ### ChoreAssignments.SetSchedule
 
 Authored path: `ChoreAssignments.SetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 76.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 83.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 78.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 85.
 
 ```reaction
 when RequestBoundary.request (entries, household, path: "/assignments/set", requestId, session)
@@ -2204,8 +2204,8 @@ then
 ### ChoreAssignments.SetSchedule:assigned#2
 
 Authored path: `ChoreAssignments.SetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 76.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 83.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 78.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 85.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.SetSchedule
@@ -2221,8 +2221,8 @@ then
 ### ChoreAssignments.SetSchedule:assigned#3
 
 Authored path: `ChoreAssignments.SetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 76.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 83.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 78.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 85.
 
 ```reaction
 when TaskScheduling.setSchedule (entries, group: household, result.entries: updated), asked by ChoreAssignments.SetSchedule:assigned#2
@@ -2235,8 +2235,8 @@ then
 ### ChoreAssignments.SetSchedule:denied#2
 
 Authored path: `ChoreAssignments.SetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 76.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 83.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 78.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 85.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.SetSchedule
@@ -2251,8 +2251,8 @@ then
 ### ChoreAssignments.SetSchedule:missingAssignee#2
 
 Authored path: `ChoreAssignments.SetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 76.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 83.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 78.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 85.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.SetSchedule
@@ -2268,8 +2268,8 @@ then
 ### ChoreAssignments.SetSchedule:missingHousehold#2
 
 Authored path: `ChoreAssignments.SetSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 76.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 83.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 78.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 85.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.SetSchedule
@@ -2355,8 +2355,8 @@ then
 ### ChoreAssignments.UpdateDeadline
 
 Authored path: `ChoreAssignments.UpdateDeadline`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 56.
 
 ```reaction
 when RequestBoundary.request (deadline, household, path: "/assignments/tasks/deadline", requestId, session, task)
@@ -2367,8 +2367,8 @@ then
 ### ChoreAssignments.UpdateDeadline:changed#2
 
 Authored path: `ChoreAssignments.UpdateDeadline`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 56.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateDeadline
@@ -2384,8 +2384,8 @@ then
 ### ChoreAssignments.UpdateDeadline:changed#3
 
 Authored path: `ChoreAssignments.UpdateDeadline`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 56.
 
 ```reaction
 when TaskScheduling.updateDeadline (deadline: timing, task), asked by ChoreAssignments.UpdateDeadline:changed#2
@@ -2398,8 +2398,8 @@ then
 ### ChoreAssignments.UpdateDeadline:completedTask#2
 
 Authored path: `ChoreAssignments.UpdateDeadline`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 56.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateDeadline
@@ -2415,8 +2415,8 @@ then
 ### ChoreAssignments.UpdateDeadline:denied#2
 
 Authored path: `ChoreAssignments.UpdateDeadline`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 56.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateDeadline
@@ -2431,8 +2431,8 @@ then
 ### ChoreAssignments.UpdateDeadline:missingHousehold#2
 
 Authored path: `ChoreAssignments.UpdateDeadline`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 56.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateDeadline
@@ -2446,8 +2446,8 @@ then
 ### ChoreAssignments.UpdateDeadline:missingTask#2
 
 Authored path: `ChoreAssignments.UpdateDeadline`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 54.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 56.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateDeadline
@@ -2462,8 +2462,8 @@ then
 ### ChoreAssignments.UpdateInterval
 
 Authored path: `ChoreAssignments.UpdateInterval`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 57.
 
 ```reaction
 when RequestBoundary.request (household, interval, path: "/assignments/tasks/interval", requestId, session, task)
@@ -2474,8 +2474,8 @@ then
 ### ChoreAssignments.UpdateInterval:changed#2
 
 Authored path: `ChoreAssignments.UpdateInterval`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 57.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateInterval
@@ -2491,8 +2491,8 @@ then
 ### ChoreAssignments.UpdateInterval:changed#3
 
 Authored path: `ChoreAssignments.UpdateInterval`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 57.
 
 ```reaction
 when TaskScheduling.updateInterval (interval: timing, task), asked by ChoreAssignments.UpdateInterval:changed#2
@@ -2505,8 +2505,8 @@ then
 ### ChoreAssignments.UpdateInterval:completedTask#2
 
 Authored path: `ChoreAssignments.UpdateInterval`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 57.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateInterval
@@ -2522,8 +2522,8 @@ then
 ### ChoreAssignments.UpdateInterval:denied#2
 
 Authored path: `ChoreAssignments.UpdateInterval`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 57.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateInterval
@@ -2538,8 +2538,8 @@ then
 ### ChoreAssignments.UpdateInterval:missingHousehold#2
 
 Authored path: `ChoreAssignments.UpdateInterval`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 57.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateInterval
@@ -2553,8 +2553,8 @@ then
 ### ChoreAssignments.UpdateInterval:missingTask#2
 
 Authored path: `ChoreAssignments.UpdateInterval`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 45.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 55.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 47.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 57.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.UpdateInterval
@@ -2569,8 +2569,8 @@ then
 ### ChoreAssignments.WeeklyAutoSchedule
 
 Authored path: `ChoreAssignments.WeeklyAutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 60.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 70.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 72.
 
 ```reaction
 when RequestBoundary.request (from, household, path: "/assignments/weekly", requestId, session, until)
@@ -2581,8 +2581,8 @@ then
 ### ChoreAssignments.WeeklyAutoSchedule:denied#2
 
 Authored path: `ChoreAssignments.WeeklyAutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 60.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 70.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 72.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.WeeklyAutoSchedule
@@ -2597,8 +2597,8 @@ then
 ### ChoreAssignments.WeeklyAutoSchedule:missingHousehold#2
 
 Authored path: `ChoreAssignments.WeeklyAutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 60.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 70.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 72.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.WeeklyAutoSchedule
@@ -2612,8 +2612,8 @@ then
 ### ChoreAssignments.WeeklyAutoSchedule:scheduled#2
 
 Authored path: `ChoreAssignments.WeeklyAutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 60.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 70.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 72.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by ChoreAssignments.WeeklyAutoSchedule
@@ -2632,8 +2632,8 @@ then
 ### ChoreAssignments.WeeklyAutoSchedule:scheduled#3
 
 Authored path: `ChoreAssignments.WeeklyAutoSchedule`.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 60.
-- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 70.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 62.
+- Covered by [Chore Assignments](../design/compositions/ChoreAssignments.md), line 72.
 
 ```reaction
 when TaskScheduling.autoSchedule (chorePreferences: usablePreferences, from: fromDate, group: household, onlyUnassigned: true, people, preferences, until: untilDate, scheduled, unassigned), asked by ChoreAssignments.WeeklyAutoSchedule:scheduled#2
@@ -2666,8 +2666,8 @@ then
 ### HouseholdManagement.AddCategory
 
 Authored path: `HouseholdManagement.AddCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 56.
 
 ```reaction
 when RequestBoundary.request (household, name, path: "/households/categories/add", requestId, session)
@@ -2678,8 +2678,8 @@ then
 ### HouseholdManagement.AddCategory:accessDenied#2
 
 Authored path: `HouseholdManagement.AddCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 56.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.AddCategory
@@ -2694,8 +2694,8 @@ then
 ### HouseholdManagement.AddCategory:added#2
 
 Authored path: `HouseholdManagement.AddCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 56.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.AddCategory
@@ -2709,8 +2709,8 @@ then
 ### HouseholdManagement.AddCategory:added#3
 
 Authored path: `HouseholdManagement.AddCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 56.
 
 ```reaction
 when HouseholdManaging.addCategory (household, name, category), asked by HouseholdManagement.AddCategory:added#2
@@ -2723,8 +2723,8 @@ then
 ### HouseholdManagement.AddCategory:missingHousehold#2
 
 Authored path: `HouseholdManagement.AddCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 56.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.AddCategory
@@ -2738,8 +2738,8 @@ then
 ### HouseholdManagement.AddResident
 
 Authored path: `HouseholdManagement.AddResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 30.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 19.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 28.
 
 ```reaction
 when RequestBoundary.request (household, path: "/households/residents/add", person, requestId, session)
@@ -2750,8 +2750,8 @@ then
 ### HouseholdManagement.AddResident:accessDenied#2
 
 Authored path: `HouseholdManagement.AddResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 30.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 19.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 28.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.AddResident
@@ -2766,8 +2766,8 @@ then
 ### HouseholdManagement.AddResident:added#2
 
 Authored path: `HouseholdManagement.AddResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 30.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 19.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 28.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.AddResident
@@ -2782,8 +2782,8 @@ then
 ### HouseholdManagement.AddResident:added#3
 
 Authored path: `HouseholdManagement.AddResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 30.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 19.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 28.
 
 ```reaction
 when HouseholdManaging.addResident (household, person, residency), asked by HouseholdManagement.AddResident:added#2
@@ -2796,8 +2796,8 @@ then
 ### HouseholdManagement.AddResident:missingHousehold#2
 
 Authored path: `HouseholdManagement.AddResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 30.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 19.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 28.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.AddResident
@@ -2811,8 +2811,8 @@ then
 ### HouseholdManagement.AddResident:missingPerson#2
 
 Authored path: `HouseholdManagement.AddResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 30.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 19.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 28.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.AddResident
@@ -2827,8 +2827,8 @@ then
 ### HouseholdManagement.CreateHousehold
 
 Authored path: `HouseholdManagement.CreateHousehold`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 11.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 16.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 9.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 14.
 
 ```reaction
 when RequestBoundary.request (name, path: "/households/create", requestId, session)
@@ -2839,8 +2839,8 @@ then
 ### HouseholdManagement.CreateHousehold#2
 
 Authored path: `HouseholdManagement.CreateHousehold`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 11.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 16.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 9.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 14.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.CreateHousehold
@@ -2853,8 +2853,8 @@ then
 ### HouseholdManagement.CreateHousehold#3
 
 Authored path: `HouseholdManagement.CreateHousehold`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 11.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 16.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 9.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 14.
 
 ```reaction
 when HouseholdManaging.create (name, overseer: requester, household), asked by HouseholdManagement.CreateHousehold#2
@@ -3142,8 +3142,8 @@ then
 ### HouseholdManagement.RemoveCategory
 
 Authored path: `HouseholdManagement.RemoveCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 53.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 60.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
 
 ```reaction
 when RequestBoundary.request (category, household, path: "/households/categories/remove", requestId, session)
@@ -3154,8 +3154,8 @@ then
 ### HouseholdManagement.RemoveCategory:accessDenied#2
 
 Authored path: `HouseholdManagement.RemoveCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 53.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 60.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveCategory
@@ -3170,8 +3170,8 @@ then
 ### HouseholdManagement.RemoveCategory:hasChores#2
 
 Authored path: `HouseholdManagement.RemoveCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 53.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 60.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveCategory
@@ -3187,8 +3187,8 @@ then
 ### HouseholdManagement.RemoveCategory:hasTasks#2
 
 Authored path: `HouseholdManagement.RemoveCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 53.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 60.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveCategory
@@ -3205,8 +3205,8 @@ then
 ### HouseholdManagement.RemoveCategory:missingCategory#2
 
 Authored path: `HouseholdManagement.RemoveCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 53.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 60.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveCategory
@@ -3221,8 +3221,8 @@ then
 ### HouseholdManagement.RemoveCategory:missingHousehold#2
 
 Authored path: `HouseholdManagement.RemoveCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 53.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 60.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveCategory
@@ -3236,8 +3236,8 @@ then
 ### HouseholdManagement.RemoveCategory:removed#2
 
 Authored path: `HouseholdManagement.RemoveCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 53.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 60.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveCategory
@@ -3254,8 +3254,8 @@ then
 ### HouseholdManagement.RemoveCategory:removed#3
 
 Authored path: `HouseholdManagement.RemoveCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 53.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 60.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 58.
 
 ```reaction
 when HouseholdManaging.removeCategory (category, household), asked by HouseholdManagement.RemoveCategory:removed#2
@@ -3394,8 +3394,8 @@ then
 ### HouseholdManagement.RemoveResident
 
 Authored path: `HouseholdManagement.RemoveResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 31.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 29.
 
 ```reaction
 when RequestBoundary.request (household, path: "/households/residents/remove", person, requestId, session)
@@ -3406,8 +3406,8 @@ then
 ### HouseholdManagement.RemoveResident:accessDenied#2
 
 Authored path: `HouseholdManagement.RemoveResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 31.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 29.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveResident
@@ -3422,8 +3422,8 @@ then
 ### HouseholdManagement.RemoveResident:missingHousehold#2
 
 Authored path: `HouseholdManagement.RemoveResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 31.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 29.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveResident
@@ -3437,8 +3437,8 @@ then
 ### HouseholdManagement.RemoveResident:missingResident#2
 
 Authored path: `HouseholdManagement.RemoveResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 31.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 29.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveResident
@@ -3453,8 +3453,8 @@ then
 ### HouseholdManagement.RemoveResident:removed#2
 
 Authored path: `HouseholdManagement.RemoveResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 31.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 29.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RemoveResident
@@ -3469,8 +3469,8 @@ then
 ### HouseholdManagement.RemoveResident:removed#3
 
 Authored path: `HouseholdManagement.RemoveResident`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 23.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 31.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 21.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 29.
 
 ```reaction
 when HouseholdManaging.removeResident (household, person, residency), asked by HouseholdManagement.RemoveResident:removed#2
@@ -3483,8 +3483,8 @@ then
 ### HouseholdManagement.RenameCategory
 
 Authored path: `HouseholdManagement.RenameCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 59.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 57.
 
 ```reaction
 when RequestBoundary.request (category, household, name, path: "/households/categories/rename", requestId, session)
@@ -3495,8 +3495,8 @@ then
 ### HouseholdManagement.RenameCategory:accessDenied#2
 
 Authored path: `HouseholdManagement.RenameCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 59.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 57.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RenameCategory
@@ -3511,8 +3511,8 @@ then
 ### HouseholdManagement.RenameCategory:missingCategory#2
 
 Authored path: `HouseholdManagement.RenameCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 59.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 57.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RenameCategory
@@ -3527,8 +3527,8 @@ then
 ### HouseholdManagement.RenameCategory:missingHousehold#2
 
 Authored path: `HouseholdManagement.RenameCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 59.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 57.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RenameCategory
@@ -3542,8 +3542,8 @@ then
 ### HouseholdManagement.RenameCategory:renamed#2
 
 Authored path: `HouseholdManagement.RenameCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 59.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 57.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RenameCategory
@@ -3558,8 +3558,8 @@ then
 ### HouseholdManagement.RenameCategory:renamed#3
 
 Authored path: `HouseholdManagement.RenameCategory`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 51.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 59.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 49.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 57.
 
 ```reaction
 when HouseholdManaging.renameCategory (category, household, name), asked by HouseholdManagement.RenameCategory:renamed#2
@@ -3572,8 +3572,8 @@ then
 ### HouseholdManagement.RenameHousehold
 
 Authored path: `HouseholdManagement.RenameHousehold`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 43.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 41.
 
 ```reaction
 when RequestBoundary.request (household, name, path: "/households/rename", requestId, session)
@@ -3584,8 +3584,8 @@ then
 ### HouseholdManagement.RenameHousehold:accessDenied#2
 
 Authored path: `HouseholdManagement.RenameHousehold`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 43.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 41.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RenameHousehold
@@ -3600,8 +3600,8 @@ then
 ### HouseholdManagement.RenameHousehold:missingHousehold#2
 
 Authored path: `HouseholdManagement.RenameHousehold`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 43.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 41.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RenameHousehold
@@ -3615,8 +3615,8 @@ then
 ### HouseholdManagement.RenameHousehold:renamed#2
 
 Authored path: `HouseholdManagement.RenameHousehold`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 43.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 41.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.RenameHousehold
@@ -3630,8 +3630,8 @@ then
 ### HouseholdManagement.RenameHousehold:renamed#3
 
 Authored path: `HouseholdManagement.RenameHousehold`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 43.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 41.
 
 ```reaction
 when HouseholdManaging.rename (household, name), asked by HouseholdManagement.RenameHousehold:renamed#2
@@ -3644,8 +3644,8 @@ then
 ### HouseholdManagement.SetOverseer
 
 Authored path: `HouseholdManagement.SetOverseer`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 44.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 42.
 
 ```reaction
 when RequestBoundary.request (household, path: "/households/overseer", person, requestId, session)
@@ -3656,8 +3656,8 @@ then
 ### HouseholdManagement.SetOverseer:accessDenied#2
 
 Authored path: `HouseholdManagement.SetOverseer`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 44.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 42.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.SetOverseer
@@ -3672,8 +3672,8 @@ then
 ### HouseholdManagement.SetOverseer:missingHousehold#2
 
 Authored path: `HouseholdManagement.SetOverseer`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 44.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 42.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.SetOverseer
@@ -3687,8 +3687,8 @@ then
 ### HouseholdManagement.SetOverseer:missingResident#2
 
 Authored path: `HouseholdManagement.SetOverseer`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 44.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 42.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.SetOverseer
@@ -3703,8 +3703,8 @@ then
 ### HouseholdManagement.SetOverseer:transferred#2
 
 Authored path: `HouseholdManagement.SetOverseer`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 44.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 42.
 
 ```reaction
 when Sessioning.use (session, subject: requester), asked by HouseholdManagement.SetOverseer
@@ -3719,8 +3719,8 @@ then
 ### HouseholdManagement.SetOverseer:transferred#3
 
 Authored path: `HouseholdManagement.SetOverseer`.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 38.
-- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 44.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 36.
+- Covered by [Household Management](../design/compositions/HouseholdManagement.md), line 42.
 
 ```reaction
 when HouseholdManaging.setOverseer (household, person), asked by HouseholdManagement.SetOverseer:transferred#2

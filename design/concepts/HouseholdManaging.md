@@ -1,7 +1,7 @@
 # HouseholdManaging
 
 ## Purpose
-Let people establish shared households and manage residents, oversight, and chore rankings.
+Let people establish and maintain shared households, and manage its residents, overseer, and keep track of household work categories and resident preferences.
 
 *Prevents*: uncertainty about who belongs to a household, who oversees a household, and the categories available for organizing housework. 
 

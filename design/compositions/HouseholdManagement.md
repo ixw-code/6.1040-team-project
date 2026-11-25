@@ -2,9 +2,7 @@
 
 Household Management allows people to establish and manage households, including their residents, overseer, work categories, and resident preferences.
 
-HouseholdManaging stores households, residencies, and chore rankings. ChoreCataloguing stores reusable chores, and TaskScheduling stores dated tasks and availability. The category endpoints below support legacy clients and existing data.
-
-Residents save their own ordered list of catalog chore IDs through `POST /api/catalog/preferences`. The endpoint accepts `household` and `order`, verifies household membership and chore ownership, and writes the order to the residency. The catalog read returns only the signed-in resident’s order. The overseer can call `POST /api/catalog/delete` with `household` and `chore` to remove a chore from the active catalog while preserving existing assignments.
+HouseholdManaging stores households, residencies, categories, and preferences. ChoreCataloguing associates reusable chores with households and optional categories, while TaskScheduling associates tasks and resident availability with households.
 
 ## Creating households
 
@@ -60,7 +58,9 @@ HouseholdManagement.RenameCategory at /households/categories/rename
 HouseholdManagement.RemoveCategory at /households/categories/remove
 ```
 
-## Legacy category preferences
+## Setting preferences
+
+Residents can rank individual catalog chores through `POST /api/catalog/preferences`. The endpoint verifies household membership and that each chore is active in the household, then saves the order on the residency. Catalog reads return the signed-in resident’s order. The category preferences below support legacy clients and saved data.
 
 Residents can set their preferences for categories of work in their household, choosing `PREFER`, `NEUTRAL`, or `AVOID`. Preferences are initialized to `NEUTRAL` when a residency or category is created.
 

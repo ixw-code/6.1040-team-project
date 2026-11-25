@@ -36,13 +36,15 @@ ChoreAssignments.RemoveAvailability at /assignments/availability/remove
 
 ## Creating tasks from chores
 
-Only the household overseer can create tasks for their household. The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) checks their authorization. The [ValidHouseholdChore view](view:ChoreAssignments.ValidHouseholdChore) checks that the selected chore belongs to the household and its category is valid when present, using `ChoreCataloguing._get` and `HouseholdManaging`.
+Only the household overseer can create tasks for their household. The [CanManageSchedule view](view:ChoreAssignments.CanManageSchedule) checks their authorization. The [ValidHouseholdChore view](view:ChoreAssignments.ValidHouseholdChore) checks that the selected chore is active in the household and its category is valid when present, using `ChoreCataloguing._active` and `HouseholdManaging`.
 
 The [create-a-task endpoint](reaction:ChoreAssignments.CreateTask) coordinates the permission checks and invokes `TaskScheduling.add` with the chore's identity, category, difficulty weight, and at least one of a deadline and interval. The endpoint reads category and difficulty from the catalogue rather than accepting them in the request. Omission or null clears timing on the respective update endpoint, subject to the task's timing invariants. Later changes to the chore's weight or category in its definition in `ChoreCataloguing` do not change tasks already created. A resident's total reflects the weight each task had when it was created.
 
 The [CreateTaskBatch endpoint](reaction:ChoreAssignments.CreateTaskBatch) creates all dated occurrences of the selected chore in one write. When weekly repetition is selected, the occurrences form one assignment with a shared assignee. Each occurrence keeps its own evidence and completion record. An occurrence can be on a specific day or span a completion window. The browser repeats the entire window weekly and sends the resulting UTC intervals. Weekly occurrences may touch at their endpoints. Overlapping windows are refused. Reusing a request ID within the household returns the task IDs from the original batch.
 
-The [DeleteAssignment endpoint](reaction:ChoreAssignments.DeleteAssignment) removes a standalone assignment or whole weekly series from the schedule. It retains approved evidence and completion records. The overseer can also [remove incomplete tasks](reaction:ChoreAssignments.RemoveTask), [update deadlines](reaction:ChoreAssignments.UpdateDeadline), or [update scheduled intervals](reaction:ChoreAssignments.UpdateInterval). The [AssignmentIsModifiable view](view:ChoreAssignments.AssignmentIsModifiable) checks that the task belongs to the household and is incomplete before allowing modification, and the endpoints use the corresponding `TaskScheduling` actions.
+The [DeleteAssignment endpoint](reaction:ChoreAssignments.DeleteAssignment) archives a standalone assignment or whole weekly series and retains completion records and reviewed evidence. Archiving a chore through `POST /api/catalog/delete` removes it from the active catalog and preserves its details for existing assignments. Both actions require the household overseer.
+
+The overseer can also [remove incomplete tasks](reaction:ChoreAssignments.RemoveTask), [update deadlines](reaction:ChoreAssignments.UpdateDeadline), or [update scheduled intervals](reaction:ChoreAssignments.UpdateInterval). The [AssignmentIsModifiable view](view:ChoreAssignments.AssignmentIsModifiable) uses TaskScheduling._incomplete to check that the task belongs to the household and is incomplete before allowing modification, and the endpoints use the corresponding `TaskScheduling` actions.
 
 Requests are refused with `TASK_WEIGHT_INVALID` for invalid weights, `TASK_INTERVAL_INVALID` for invalid timing, `NOT_FOUND` for nonexistent tasks, or `TASK_STATUS_CONFLICT` for modifications to completed tasks. Invalid chore references are refused with `NOT_FOUND`; unauthorized requests with `ACCESS_DENIED`, and unauthenticated requests with `UNAUTHENTICATED`.
 
@@ -119,7 +121,7 @@ The [EditAvailability endpoint](reaction:ChoreAssignments.EditAvailability) appl
 ### Assumptions
 The composition assumes that all household residents, including the overseer, are eligible for assignment. HouseholdManaging owns membership, oversight, and preferences, while TaskScheduling owns availability, assignments, and completion state. Authorization is checked by the composition using `Sessioning.use` on the existing session cookie. Signed-out requests use the shared `NOT_SIGNED_IN` refusal for the unauthenticated case. The HTTP policy maps it to 401 and preserves the standard HTTP categories for the other domain refusals.
 
-We also assume that the overseer creates tasks for one week or a bounded date range before assigning residents. Timing inputs use UTC ISO timestamps and intervals use start and end. The request flow supplies the clock for display status.
+We also assume that the overseer creates tasks for one week or a bounded date range before assigning residents. Timing inputs use UTC ISO timestamps and intervals use start and end. The request flow supplies the timestamp used by TaskScheduling._status for display status.
 
 ```computations
 availabilityWindows(windows: IntervalInputs) : IntervalSet
@@ -136,10 +138,6 @@ assignmentPeople(entries: ScheduleEntries) : People
   Returns the distinct assignees supplied in the batch.
 matchesPersonalTask(person: String, assignee?: String, completedBy?: String, mode: String) : TaskMatch
   Reports whether the resident matches the assignment or completion filter.
-assignmentStatus(deadline?: DateTime, interval?: Interval, completedAt?: DateTime, asOf: DateTime) : String
-  Derives the task status using the same cutoff as TaskScheduling.
-assignmentIsIncomplete(completedAt?: DateTime) : IncompleteMatch
-  Reports whether the task has no completion timestamp.
 ```
 
 Alpha supports joining and leaving households, setting availability, creating tasks, assigning tasks manually or automatically for a selected week, and reading the schedule. Residents can arrange a swap outside the app and ask the overseer to reassign the tasks.

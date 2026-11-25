@@ -7,15 +7,16 @@ export function completionHooks({ TaskScheduling, ChoreCataloguing, HouseholdMan
   return {
     householdTasks: household => TaskScheduling._tasks({ group: household }),
     async task(task) {
-      const [entry] = await TaskScheduling._get({ task });
+      const [entry] = await TaskScheduling._completionContext({ task });
       if (!entry) return;
       const [chore] = await ChoreCataloguing._get({ chore: entry.item });
       if (!chore || chore.group !== entry.group) return;
+      const completed = entry.completion === "COMPLETED";
       return {
         task, household: entry.group, assignee: entry.assignee ?? "", title: chore.name,
         criteria: chore.requirements.join("\n"), photoInstructions: chore.description,
-        baseline: chore.references[0], dueAt: entry.deadline ?? entry.interval!.end, interval: entry.interval,
-        active: !entry.archived && !entry.completedAt, archived: entry.archived, completed: Boolean(entry.completedAt),
+        baseline: chore.references[0], dueAt: entry.dueAt, interval: entry.interval,
+        active: !entry.archived && !completed, archived: entry.archived, completed,
       };
     },
     async role(household, person) {

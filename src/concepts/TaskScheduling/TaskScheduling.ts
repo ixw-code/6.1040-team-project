@@ -18,6 +18,7 @@ export class CompletionTimeInvalid extends Error {}
 type Interval = { start: Date; end: Date };
 type Source = "AUTO" | "MANUAL";
 type Status = "PENDING" | "OVERDUE" | "COMPLETED" | "COMPLETED_LATE";
+type CompletionState = "INCOMPLETE" | "COMPLETED";
 type PreferenceLevel = "PREFER" | "NEUTRAL" | "AVOID";
 type TaskRef = { task: string };
 type GroupRef = { group: string };
@@ -86,7 +87,7 @@ function clearAssignment(task: Task): void {
   delete task.source;
 }
 
-function isCompleted(task: Task): task is Task & Completion {
+function isCompleted<T extends Partial<Completion>>(task: T): task is T & Completion {
   return task.completedAt !== undefined && task.completedBy !== undefined;
 }
 
@@ -176,7 +177,7 @@ function taskStart(task: Task): Date {
   return task.interval?.start ?? task.deadline!;
 }
 
-export function statusAt(task: Pick<Task, "interval" | "deadline" | "completedAt">, now: Date): Status {
+function statusAt(task: Pick<Task, "interval" | "deadline" | "completedAt">, now: Date): Status {
   const cutoff = task.interval?.end ?? task.deadline!;
   if (task.completedAt) return task.completedAt > cutoff ? "COMPLETED_LATE" : "COMPLETED";
   return now > cutoff ? "OVERDUE" : "PENDING";
@@ -675,6 +676,30 @@ export class TaskSchedulingConcept {
     if (!state) return [];
     const [{ task: _task, ...details }] = state.tasks;
     return [{ group: state._id, ...details }];
+  }
+
+  async _completionContext({ task }: TaskRef): Promise<
+    (GroupRef & Pick<Task, "item" | "assignee" | "interval" | "archived"> & { dueAt: Date; completion: CompletionState })[]
+  > {
+    const [details] = await this._get({ task });
+    if (!details) return [];
+    const { group, item, assignee, deadline, interval, archived } = details;
+    return [{
+      group, item, ...(assignee !== undefined && { assignee }),
+      dueAt: deadline ?? interval!.end,
+      completion: isCompleted(details) ? "COMPLETED" : "INCOMPLETE",
+      ...(interval && { interval }), ...(archived !== undefined && { archived }),
+    }];
+  }
+
+  async _status({ task, asOf }: TaskRef & { asOf: Date }): Promise<{ status: Status }[]> {
+    const [details] = await this._get({ task });
+    return details ? [{ status: statusAt(details, asOf) }] : [];
+  }
+
+  async _incomplete({ task }: TaskRef): Promise<GroupRef[]> {
+    const [details] = await this._get({ task });
+    return details && !details.archived && !isCompleted(details) ? [{ group: details.group }] : [];
   }
 
   async _activeTask({ task }: TaskRef): Promise<GroupRef[]> {

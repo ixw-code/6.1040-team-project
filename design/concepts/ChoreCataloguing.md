@@ -53,7 +53,7 @@ Rule: difficulty weights are finite numbers bounded in the range [1.0, 10.0]
 ## Actions 
 ```actions
 create(group: Group, name: String, description: String, category?: Category, difficulty: Number, requirements: RequirementSet, references: PhotoSet ): returns (chore: Chore)
-  where chore with name for group already exists 
+  where an active chore with the same name for the group already exists
   then 
     refuses CHORE_NAME_CONFLICT "Chore with the same name already exists."
   where chore name is invalid according to rules

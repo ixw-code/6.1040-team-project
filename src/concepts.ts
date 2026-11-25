@@ -10,8 +10,8 @@ import { choreCataloguing } from "./concepts/ChoreCataloguing/registry.ts";
 import { taskScheduling } from "./concepts/TaskScheduling/registry.ts";
 
 import {
-    assignmentDate, assignmentInterval, assignmentIsIncomplete,
-    assignmentPeople, assignmentStatus, matchesPersonalTask, availabilityWindows, assignmentCategory, activeChorePreferences,
+    assignmentDate, assignmentInterval,
+    assignmentPeople, matchesPersonalTask, availabilityWindows, assignmentCategory, activeChorePreferences,
 } from "./compositions/assignmentComputations.ts";
 
 export const applicationConceptSet = conceptSet({
@@ -24,7 +24,7 @@ export const applicationConceptSet = conceptSet({
     Authenticating: authenticating, 
     Sessioning: sessioning
 }, {
-    assignmentDate, assignmentInterval, assignmentIsIncomplete,
-    assignmentPeople, assignmentStatus, matchesPersonalTask, availabilityWindows, assignmentCategory, activeChorePreferences,
+    assignmentDate, assignmentInterval,
+    assignmentPeople, matchesPersonalTask, availabilityWindows, assignmentCategory, activeChorePreferences,
 });
 export const { concepts, computations } = applicationConceptSet;

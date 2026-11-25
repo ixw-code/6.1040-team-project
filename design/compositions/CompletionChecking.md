@@ -36,7 +36,7 @@ Only an Overseer for the submission’s household can review it. The review endp
 
 The review queue lists current submissions awaiting manual review in that household. Each item includes the resident, task, photo, completion criteria, and submission time. When the attempt has a baseline, the queue shows it alongside the submitted photo. The Overseer can inspect the evidence and approve or reject it from the same screen.
 
-Approval records the reviewer and review time. Rejection also requires a reason explaining what needs to be corrected or shown more clearly. The rejected submission and its feedback remain in the resident’s history.
+Approval records the reviewer and review time. Rejection also requires a reason explaining what needs to be corrected or shown more clearly. The resident sees that reason and can submit another attempt while the window is open. The rejected submission and its feedback remain in the history.
 
 Only pending submissions can receive a decision. An approved submission cannot be withdrawn, changed, or reviewed again. A rejected submission keeps its decision; another attempt creates a new submission.
 
@@ -60,26 +60,19 @@ CompletionChecking uses the login cookie to identify the caller. `POST` routes a
 | `GET` | `/api/completion/submissions/:submission/baseline` | saved baseline, or `404` when the attempt has no baseline |
 | `GET` | `/api/completion/submissions/:submission/photo` | `submission` in the path |
 
-The running application resolves household roles through HouseholdManaging and reads tasks and chore details through TaskScheduling and ChoreCataloguing. Approval records the original submission time on the scheduled task before crediting Ranking.
+The application reads tasks and assignments from TaskScheduling, membership and oversight from HouseholdManaging, and evidence instructions from ChoreCataloguing.
 
 ## Choosing AI review - Beta
 
 When submitting a photo, the resident chooses manual review or automatic AI review. Manual review sends the submission directly to the Overseer’s review queue. AI review creates an assessment request through Reasoning and requires the resident’s consent.
 
-Residents can turn AI review on or off.[enable][disable] Consenting records their choice under the use `check-chore-photos`. AI review starts as off because no consent exists initially.
+Residents can turn AI review on or off. (`CompletionChecking.EnableAI`) (`CompletionChecking.DisableAI`) Consenting records their choice under the use `check-chore-photos`. AI review starts as off because no consent exists initially.
 
-The consent check determines whether AI review is allowed.[ai-access] The interface receives the same setting so it can show the resident’s current choice.[ai-setting] Even with AI review enabled, a resident can choose manual review for an individual submission.
+The consent check determines whether AI review is allowed. (`CompletionChecking.AIReviewAllowed`) The interface receives the same setting so it can show the resident’s current choice. (`CompletionChecking.AIReviewSetting`) Even with AI review enabled, a resident can choose manual review for an individual submission.
 
 Selecting AI review without consent is refused with `NOT_CONSENTED`. Manual and AI approvals give the same completion credit.
 
-Turning AI review off calls `PhotoChecking.sendToOverseer` for pending AI submissions and abandons their waiting assessment requests through `Reasoning.abandon`, recording that AI review was turned off.[withdraw]
-
-
-[enable]: reaction:CompletionChecking.EnableAI
-[disable]: reaction:CompletionChecking.DisableAI
-[ai-access]: view:CompletionChecking.AIReviewAllowed
-[ai-setting]: former:CompletionChecking.AIReviewSetting
-[withdraw]: reaction:CompletionChecking.StopPendingAIReviews
+Turning AI review off calls `PhotoChecking.sendToOverseer` for pending AI submissions and abandons their waiting assessment requests through `Reasoning.abandon`, recording that AI review was turned off. (`CompletionChecking.StopPendingAIReviews`)
 
 ```endpoints
 CompletionChecking.EnableAI at /completion/ai/on
@@ -88,17 +81,13 @@ CompletionChecking.DisableAI at /completion/ai/off
 
 ## Assessing photos - Beta
 
-Submitting a photo for AI review creates an assessment request through Reasoning.[ask] The request identifies the specific submission and asks whether its photo meets the saved completion criteria, using the baseline as a reference when provided. An open-request check prevents duplicate assessments of the same attempt.[open]
+Submitting a photo for AI review creates an assessment request through Reasoning. (`CompletionChecking.RequestAssessment`) The request identifies the specific submission and asks whether its photo meets the saved completion criteria, using the baseline as a reference when provided. An open-request check prevents duplicate assessments of the same attempt. (`CompletionChecking.HasOpenAssessment`)
 
-The checking agent takes the request and retrieves its photo, criteria, and any baseline through the evidence endpoint.[evidence] The endpoint authenticates the agent and checks that it currently holds the request.
+The checking agent takes the request and retrieves its photo, criteria, and any baseline through the evidence endpoint. (`CompletionChecking.ReadAssessmentEvidence`) The endpoint authenticates the agent and checks that it currently holds the request.
 
 Evidence is returned only while the task is active, the submission is current and pending AI review, and the resident still consents. Otherwise, the agent stops processing the request.
 
 The agent calls the model and records its answer through Reasoning. The answer must include an `approved` or `needs_review` outcome, a finding for each criterion, and feedback explaining the result.
-
-[ask]: reaction:CompletionChecking.RequestAssessment
-[open]: view:CompletionChecking.HasOpenAssessment
-[evidence]: reaction:CompletionChecking.ReadAssessmentEvidence
 
 ```endpoints
 CompletionChecking.ReadAssessmentEvidence at /completion/agent/evidence
@@ -106,11 +95,8 @@ CompletionChecking.ReadAssessmentEvidence at /completion/agent/evidence
 
 ## Applying assessments - Beta
 
-A completed assessment can approve a submission only when its answer has the expected structure and reports that every criterion is met.[apply] Before applying it, the composition checks again that the task is active, the resident still consents, and the submission is current and pending AI review.
+A completed assessment can approve a submission only when its answer has the expected structure and reports that every criterion is met. (`CompletionChecking.ApplyAssessment`) Before applying it, the composition checks again that the task is active, the resident still consents, and the submission is current and pending AI review.
 
-Incomplete or unclear results go to the Overseer for manual review.[refer] Failed or malformed assessments also enter the manual queue. These submissions remain pending; an AI referral does not reject them.
+Incomplete or unclear results go to the Overseer for manual review. (`CompletionChecking.ReferForHumanReview`) Failed or malformed assessments also enter the manual queue. These submissions remain pending; an AI referral does not reject them.
 
 An assessment cannot change an approved or rejected submission, overwrite a human decision, or decide a submission that has moved to manual review.
-
-[apply]: reaction:CompletionChecking.ApplyAssessment
-[refer]: reaction:CompletionChecking.ReferForHumanReview

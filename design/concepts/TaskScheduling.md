@@ -44,6 +44,9 @@ Source is AUTO or MANUAL
 Status is PENDING or OVERDUE or COMPLETED or COMPLETED_LATE
   Whether atask has been completed or not, in regards to its deadline.
 
+CompletionState is INCOMPLETE or COMPLETED
+  Whether the task has a recorded completion.
+
 opaque WeekAvailability
   A level for each weekday. Levels are available, somewhat available, and not available.
 
@@ -361,6 +364,15 @@ _assignments(group: Group, from: DateTime, until: DateTime) : many (task: Task, 
 
 _get(task: Task) : optional (group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime, archived?: Flag, timeZone?: String, flexibleDays?: Flag)
   Returns task details if task exists, or no rows otherwise.
+
+_completionContext(task: Task) : optional (group: Group, item: Item, assignee?: Person, dueAt: DateTime, completion: CompletionState, interval?: Interval, archived?: Flag)
+  Returns the task group, item, optional assignee, due time, completion state, interval, and archive status from one read, or no row for an unknown task. The due time is the deadline if present, otherwise the scheduled interval end.
+
+_status(task: Task, asOf: DateTime) : optional (status: Status)
+  Returns the task status, or no row for an unknown task. The cutoff is the interval end when present, otherwise the deadline. Incomplete tasks are overdue only when asOf is after the cutoff. Completed tasks are late only when completed after the cutoff.
+
+_incomplete(task: Task) : optional (group: Group)
+  Returns the owning group for an active, incomplete task. Returns no row for missing, completed, or archived tasks.
 
 _activeTask(task: Task) : optional (group: Group)
   Returns the household if the task is visible in the schedule.

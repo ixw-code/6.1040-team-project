@@ -1,5 +1,3 @@
-import { statusAt } from "../concepts/TaskScheduling/TaskScheduling.ts";
-
 export function assignmentDate({ value }: { value: string | null }): Date | undefined {
   return value === null ? undefined : new Date(value);
 }
@@ -20,16 +18,6 @@ export function matchesPersonalTask({
   person, assignee, completedBy, mode,
 }: { person: string; assignee?: string; completedBy?: string; mode: string }): { matches: boolean } {
   return { matches: (mode !== "completed" && assignee === person) || (mode !== "assigned" && completedBy === person) };
-}
-
-export function assignmentStatus({
-  deadline, interval, completedAt, asOf,
-}: { deadline?: Date; interval?: { start: Date; end: Date }; completedAt?: Date; asOf: Date }): string {
-  return statusAt({ deadline, interval, completedAt }, asOf);
-}
-
-export function assignmentIsIncomplete({ completedAt }: { completedAt?: Date }): { incomplete: boolean } {
-  return { incomplete: completedAt == null };
 }
 
 export function availabilityWindows({ windows }: { windows: { start: string; end: string }[] }) {

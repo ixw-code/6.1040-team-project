@@ -1,5 +1,5 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
-import { each, former, is, no, view, where } from "@mit-sdg/sync-engine/language";
+import { each, former, is, no, view, where, whether } from "@mit-sdg/sync-engine/language";
 import { concepts } from "../concepts.ts";
 
 const { HouseholdManaging, ChoreCataloguing, TaskScheduling, Registering, Sessioning } = concepts;
@@ -56,8 +56,10 @@ const PersonHouseholds = former(
 
 const HouseholdResidents = former(
   "the residents of (household)",
-  ({ household }, { person }) =>
-    each(HouseholdManaging._residents({ household }).is({ person })).form({ person }),
+  ({ household }, { person, username }) =>
+    each(HouseholdManaging._residents({ household }).is({ person }))
+      .where(whether(Registering._username({ user: person }).is({ username })))
+      .form({ person, username }),
 );
 
 const HouseholdCategories = former(
