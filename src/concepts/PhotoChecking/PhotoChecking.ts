@@ -34,7 +34,14 @@ type ReviewUpdate =
 export class PhotoCheckingConcept {
   #attemptIndex?: Promise<string>;
 
-  constructor(private readonly getDb: () => Db) {}
+  constructor(
+    private readonly getDb: () => Db,
+    private readonly ownsUpload: (photo: string, person: string) => Promise<boolean> = async () => false,
+  ) {}
+
+  async _ownedUpload({ photo, person }: { photo: string; person: string }): Promise<{ photo: string }[]> {
+    return await this.ownsUpload(photo, person) ? [{ photo }] : [];
+  }
 
   #submissions() {
     return this.getDb().collection<Submission>("photo_checking_submissions");

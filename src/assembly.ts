@@ -1,3 +1,5 @@
+import { composition as CompletionChecking } from "./compositions/CompletionChecking.ts";
+import { createPhotoStore } from "./adapters/photos.ts";
 import { assemble } from "@mit-sdg/sync-engine/assembly";
 import { applicationConceptSet } from "./concepts.ts";
 import { PhotoCheckingConcept } from "./concepts/PhotoChecking/PhotoChecking.ts";
@@ -15,20 +17,22 @@ import { ChoreCataloguingConcept } from "./concepts/ChoreCataloguing/ChoreCatalo
 import { TaskSchedulingConcept } from "./concepts/TaskScheduling/TaskScheduling.ts";
 
 // Use the app database by default and let tests supply an isolated database.
-export function assembleApplication(database = getDb) {
+export function assembleApplication(database = getDb, clock?: () => Date) {
   return assemble({
+    clock,
     conceptSet: applicationConceptSet,
     composition: {
       Users,
       HouseholdManagement,
       ChoreAssignments,
+      CompletionChecking,
     },
     instances: {
       HouseholdManaging: new HouseholdManagingConcept(database),
       ChoreCataloguing: new ChoreCataloguingConcept(database),
       TaskScheduling: new TaskSchedulingConcept(database),
       Ranking: new RankingConcept(database),
-      PhotoChecking: new PhotoCheckingConcept(database),
+      PhotoChecking: new PhotoCheckingConcept(database, (photo, person) => createPhotoStore(database()).owns(photo, person)),
       Registering: new RegisteringConcept(database),
       Authenticating: new Authenticating(database),
       Sessioning: new Sessioning(database),

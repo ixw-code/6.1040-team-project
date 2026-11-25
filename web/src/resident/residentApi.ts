@@ -51,7 +51,7 @@ export function useResidentApi() {
   }
   async function submitPhoto(task: string, file: File) {
     const photo = await upload(file);
-    await post("completion/submit", { task, photo });
+    checked(await api.completion.submit({ task, photo }));
   }
   return { getPeople, getTask, getMyTasks, getSchedule, submitPhoto };
 }

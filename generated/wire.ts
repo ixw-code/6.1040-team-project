@@ -384,6 +384,17 @@ export type ShiftHappensWire = {
     };
     error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "PREFERENCES_INVALID" | "SCHEDULE_WINDOW_INVALID" };
   };
+  "/completion/submit": {
+    input: {
+      "photo": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["photo"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["_ownedUpload"]>[0], ["photo"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "task": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["subject"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_completionContext"]>[0], ["task"]>]>]>>;
+    };
+    output: {
+      "submission": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>>, ["submission"]>>;
+    };
+    error: { error: AppWideError | "ALREADY_APPROVED" | "ALREADY_PENDING" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "SUBMISSION_CLOSED" | "SUBMISSION_NOT_OPEN" };
+  };
   "/households/categories": {
     input: {
       "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>]>]>>;
@@ -964,6 +975,16 @@ export type ShiftHappensWireHttp = {
       "unassigned": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["autoSchedule"]>>, ["unassigned"]>>;
     };
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/completion/submit": {
+    input: {
+      "photo": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["photo"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["_ownedUpload"]>[0], ["photo"]>]>>;
+      "task": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["subject"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_completionContext"]>[0], ["task"]>]>]>>;
+    };
+    output: {
+      "submission": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>>, ["submission"]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
   "/households/categories": {
     input: {

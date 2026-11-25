@@ -3,9 +3,8 @@ import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { createGateway } from "@mit-sdg/sync-engine/boundary";
 import { assembleApplication } from "../../src/assembly.ts";
 import { createCatalogHandler } from "../../src/compositions/Catalog.ts";
-import { createCompletionHandler } from "../../src/compositions/CompletionChecking.ts";
-import { completionHooks } from "../../src/compositions/completionHooks.ts";
-import { createPhotoHandler, createPhotoStore } from "../../src/compositions/Photos.ts";
+import { createCompletionHandler, createCompletionHooks } from "../../src/adapters/completionHttp.ts";
+import { createPhotoHandler, createPhotoStore } from "../../src/adapters/photos.ts";
 import { policy } from "../../src/http.ts";
 import { accountRequests } from "../helpers/accounts.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";
@@ -13,18 +12,19 @@ import { useMongoTestDb } from "../helpers/mongo.ts";
 const database = useMongoTestDb("alpha_workflow");
 
 function workflow(initialTime: string) {
-  const application = assembleApplication(database);
+  let now = new Date(initialTime);
+  const application = assembleApplication(database, () => now);
   const { concepts } = application;
   const store = createPhotoStore(database());
   const catalog = createCatalogHandler(concepts, store);
-  let now = new Date(initialTime);
-  const completion = createCompletionHandler(concepts, store, completionHooks(concepts), () => now);
+  const completion = createCompletionHandler(concepts, store, createCompletionHooks(concepts));
   const uploads = createPhotoHandler(store, concepts.Sessioning);
   const api = createHttpHandler({ application, gateway: createGateway({ application }), policy });
   const { session } = accountRequests(application);
 
   function send(path: string, cookie: string, input?: object) {
-    const handler = path.startsWith("catalog/") ? catalog : path.startsWith("completion/") ? completion : api;
+    const handler = path.startsWith("catalog/") ? catalog
+      : path.startsWith("completion/") && path !== "completion/submit" ? completion : api;
     return handler(new Request("http://localhost/api/" + path, {
       signal: AbortSignal.timeout(3000),
       method: input ? "POST" : "GET", headers: { Cookie: cookie, "Content-Type": "application/json", Origin: policy.publicOrigin! },
@@ -162,7 +162,7 @@ test("seven catalog chores produce fourteen tasks while preferences and completi
   const nextEvidence = { task: nextTask, photo: await upload(resident.cookie, 3) };
   const early = await send("completion/submit", resident.cookie, nextEvidence);
   expect(early.status).toBe(409);
-  expect(await early.json()).toEqual({ error: "SUBMISSION_NOT_OPEN" });
+  expect(await early.json()).toEqual({ error: "CONFLICT" });
   setTime(nextStart);
   const pending = await post("completion/submit", resident.cookie, nextEvidence);
   await post("assignments/tasks/delete", owner.cookie, { household, task: nextTask });
@@ -203,7 +203,7 @@ test("weekly weekend occurrences keep evidence and credit through reassignment a
   const photo = await upload(resident.cookie, 2);
   expect((await send("completion/submit", resident.cookie, { ...second, photo, submittedAt: windows[1].start })).status).toBe(400);
   const early = await send("completion/submit", resident.cookie, { ...second, photo });
-  expect(await early.json()).toEqual({ error: "SUBMISSION_NOT_OPEN" });
+  expect(await early.json()).toEqual({ error: "CONFLICT" });
   const attempt = await post("completion/submit", resident.cookie, { ...first, photo });
   const { queue } = await post("completion/review-queue", owner.cookie, { household });
   expect(queue.items).toMatchObject([{ ...attempt, ...first, photo, criteria: definition.criteria }]);

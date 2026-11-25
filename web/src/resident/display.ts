@@ -1,6 +1,8 @@
 // Labels, colors and date formatting shared by the resident screens.
 import type { AttemptStatus, Person, TaskStatus } from "./types.ts";
 
+const PALETTE = ["#b0d898", "#efbcd5", "#f6c79a", "#d3bdee", "#9ccfe8", "#e8d68a"];
+
 export const STATUS_LABEL: Record<TaskStatus, string> = {
   todo: "Todo",
   submitted: "Submitted",
@@ -46,6 +48,13 @@ export const isOpen = (status: TaskStatus) => status === "todo" || status === "r
 export function noteColor(status: TaskStatus, owner: Person | undefined): string {
   if (!owner || owner.isMe) return STATUS_COLOR[status];
   return isOpen(status) ? owner.color : "var(--rs-other-done)";
+}
+
+// Stable color per person, so the same resident keeps the same color across screens.
+export function colorFor(id: string): string {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return PALETTE[Math.abs(h) % PALETTE.length]!;
 }
 
 export function statusText(status: TaskStatus, owner: Person | undefined): string {

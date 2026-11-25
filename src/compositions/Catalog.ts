@@ -1,7 +1,7 @@
 import type { assembleApplication } from "../assembly.ts";
 import type { User } from "../concepts/Registering/Registering.ts";
 import { allowsAppOrigin, signedInPerson } from "../http.ts";
-import { photoResponse, type PhotoStore } from "./Photos.ts";
+import { photoResponse, type PhotoStore } from "../adapters/photos.ts";
 
 type Concepts = ReturnType<typeof assembleApplication>["concepts"];
 

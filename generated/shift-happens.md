@@ -154,6 +154,7 @@ Defined in [PhotoChecking](../design/concepts/PhotoChecking.md), line 1.
 
 #### Queries
 
+- `_ownedUpload(photo: Photo, person: Person) : optional (photo: Photo)`
 - `_current(subject: Subject) : optional (submission: Submission)`
 - `_submission(submission: Submission) : optional (person: Person, subject: Subject, photo: Photo, criteria: String, baseline?: Photo, selectedMethod: ReviewMethod, reviewMethod: ReviewMethod, status: Status, submittedAt: DateTime, reviewer?: Reviewer, reviewedAt?: DateTime, feedback: String)`
 - `_history(subject: Subject) : many (submission: Submission, status: Status, submittedAt: DateTime, reviewedAt?: DateTime, feedback: String)`
@@ -318,6 +319,8 @@ Concrete types:
 - `assignmentInterval(value: IntervalInput) : Interval` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 135.
 - `assignmentPeople(entries: ScheduleEntries) : People` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 137.
 - `availabilityWindows(windows: IntervalInputs) : IntervalSet` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 127.
+- `evidenceInstructions(requirements: Requirements, references: Photos) : EvidenceInstructions` — [Completion Checking](../design/compositions/CompletionChecking.md), line 74.
+- `evidenceWindow(interval: Interval, submittedAt: DateTime) : EvidenceWindow` — [Completion Checking](../design/compositions/CompletionChecking.md), line 76.
 - `matchesPersonalTask(person: String, assignee?: String, completedBy?: String, mode: String) : TaskMatch` — [Chore Assignments](../design/compositions/ChoreAssignments.md), line 139.
 
 ## Views
@@ -338,6 +341,21 @@ Authored path: `ChoreAssignments.ValidHouseholdChore`.
     ChoreCataloguing._active (chore) has (difficulty, group: household)
     whether ChoreCataloguing._active (chore) has (category)
     (category, present: false) is assignmentCategory (category)
+```
+
+### (person) can submit (photo) for (task)
+
+Authored path: `CompletionChecking.CanSubmit`.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 67.
+
+```view
+(person) can submit (photo) for (task) — inputs (person, photo, task); outputs (interval, requirements, references); bindings (group, item) — answers at most one (interval, requirements, references)
+  where
+    TaskScheduling._completionContext (task) has (assignee: person, completion: "INCOMPLETE", group, interval, item)
+    TaskScheduling._activeTask (task) has (group)
+    HouseholdManaging._residents (household: group) has (person)
+    PhotoChecking._ownedUpload (person, photo)
+    ChoreCataloguing._get (chore: item) has (group, references, requirements)
 ```
 
 ### (requester) lives in (household)
@@ -2643,6 +2661,99 @@ then
   RequestBoundary.respond (requestId, scheduled, unassigned)
 ```
 
+### CompletionChecking.Submit
+
+Authored path: `CompletionChecking.Submit`.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 67.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 70.
+
+```reaction
+when RequestBoundary.request (path: "/completion/submit", photo, requestId, session, task)
+then
+  Sessioning.use (session)
+```
+
+### CompletionChecking.Submit:missing#2
+
+Authored path: `CompletionChecking.Submit`.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 67.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 70.
+
+```reaction
+when Sessioning.use (session, subject: person), asked by CompletionChecking.Submit
+where
+  earlier, RequestBoundary.request (path: "/completion/submit", photo, requestId, session, task)
+  no view "(person) can submit (photo) for (task)" with (person, photo, task)
+then
+  RequestBoundary.respond (error: "NOT_FOUND", requestId)
+```
+
+### CompletionChecking.Submit:submitted#2
+
+Authored path: `CompletionChecking.Submit`.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 67.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 70.
+
+```reaction
+when Sessioning.use (session, subject: person), asked by CompletionChecking.Submit
+where
+  submittedAt is the current flow's instant
+  earlier, RequestBoundary.request (path: "/completion/submit", photo, requestId, session, task)
+  view "(person) can submit (photo) for (task)" with (person, photo, task) has (interval, references, requirements)
+  (state: "open") is evidenceWindow (interval, submittedAt)
+  (baseline, criteria) is evidenceInstructions (references, requirements)
+then
+  PhotoChecking.submit (baseline, criteria, method: "MANUAL", person, photo, subject: task, submittedAt)
+```
+
+### CompletionChecking.Submit:submitted#3
+
+Authored path: `CompletionChecking.Submit`.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 67.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 70.
+
+```reaction
+when PhotoChecking.submit (baseline, criteria, method: "MANUAL", person, photo, subject: task, submittedAt, submission), asked by CompletionChecking.Submit:submitted#2
+where
+  earlier, RequestBoundary.request (path: "/completion/submit", photo, requestId, session, task)
+then
+  RequestBoundary.respond (requestId, submission)
+```
+
+### CompletionChecking.Submit:tooEarly#2
+
+Authored path: `CompletionChecking.Submit`.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 67.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 70.
+
+```reaction
+when Sessioning.use (session, subject: person), asked by CompletionChecking.Submit
+where
+  submittedAt is the current flow's instant
+  earlier, RequestBoundary.request (path: "/completion/submit", photo, requestId, session, task)
+  view "(person) can submit (photo) for (task)" with (person, photo, task) has (interval)
+  (state: "upcoming") is evidenceWindow (interval, submittedAt)
+then
+  RequestBoundary.respond (error: "SUBMISSION_NOT_OPEN", requestId)
+```
+
+### CompletionChecking.Submit:tooLate#2
+
+Authored path: `CompletionChecking.Submit`.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 67.
+- Covered by [Completion Checking](../design/compositions/CompletionChecking.md), line 70.
+
+```reaction
+when Sessioning.use (session, subject: person), asked by CompletionChecking.Submit
+where
+  submittedAt is the current flow's instant
+  earlier, RequestBoundary.request (path: "/completion/submit", photo, requestId, session, task)
+  view "(person) can submit (photo) for (task)" with (person, photo, task) has (interval)
+  (state: "closed") is evidenceWindow (interval, submittedAt)
+then
+  RequestBoundary.respond (error: "SUBMISSION_CLOSED", requestId)
+```
+
 ### DeliverFaultToAsker
 
 ```reaction
@@ -4058,6 +4169,7 @@ not listed here have no explicit input contract.
 - `/assignments/tasks/remove` — requires `session`, `household`, `task`
 - `/assignments/total` — requires `session`, `household`, `person`
 - `/assignments/weekly` — requires `session`, `household`, `from`, `until`
+- `/completion/submit` — requires `photo`, `session`, `task`
 - `/households/categories` — requires `household`, `session`
 - `/households/categories/add` — requires `household`, `name`, `session`
 - `/households/categories/remove` — requires `category`, `household`, `session`

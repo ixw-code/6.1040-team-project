@@ -446,8 +446,29 @@ describe("ChoreAssignments", () => {
       expect((await request("availability/add", { ...target, ...interval(1, 8) }, owner.cookie)).status).toBe(200);
       const task = await createTask({ interval: interval(2, 3) });
       expect((await request("set", { entries: [{ task, assignee: resident.person }] }, owner.cookie)).status).toBe(200);
-      const removal = await post("/households/residents/remove", { household, ...target }, owner.cookie);
-      await application.whenIdle();
+      // This request deliberately faults after the residency write has succeeded.
+      const error = console.error.bind(console);
+      const warn = console.warn.bind(console);
+      const faultLog = spyOn(console, "error").mockImplementation((...args) => {
+        if (!String(args[0]).includes('"message":"Consequence action faulted"')
+          || !String(args[0]).includes('"action":"removePerson"')) error(...args);
+      });
+      const lateReplyLog = spyOn(console, "warn").mockImplementation((...args) => {
+        if (!String(args[0]).includes("HouseholdManagement.RemoveResident:removed")
+          || !String(args[0]).includes("after it stopped pending")) warn(...args);
+      });
+      const removal = await (async () => {
+        try {
+          return await post("/households/residents/remove", { household, ...target }, owner.cookie);
+        } finally {
+          try {
+            await application.whenIdle();
+          } finally {
+            faultLog.mockRestore();
+            lateReplyLog.mockRestore();
+          }
+        }
+      })();
       expect(removal).toMatchObject({ status: 500, body: { error: "INTERNAL_ERROR" } });
       expect(cleanup).toHaveBeenCalledTimes(1);
       expect(await application.concepts.HouseholdManaging._residents({ household })).toEqual([{ person: owner.person }]);

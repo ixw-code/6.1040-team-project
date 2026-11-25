@@ -1,30 +1,29 @@
-# Development Plan
+# Development Plan (Beta)
 
-| Stage | Deliverables
+| Stage | Deliverables |
 | --- | --- |
-| Alpha Checkpoint - Nov 23 | - A deployed web app that supports the manual review workflow.<br>- The Overseer can create assignments with deadlines, completion criteria, and baseline photos.<br>- Members are able to submit photos for review, the Overseer can approve or reject them with reason. Approval updates the completion status.<br>- The members are able to set their availability and preferences for chores and then get assigned randomly based on the provided information.<br>- Baseline with no AI integration yet. |
-| Beta Checkpoint - Nov 30 | - Add AI integration to complete the workflow for AI photo review with feedback for Overseer if the result is uncertain.<br>- Allow opt out option for members who prefer to get manual review by the Overseer. |
-| User Testing - Dec 7 | - Test on a small scale with a chore and members to compare to current work flow, observe points of confusion, and record incorrect decisions from the AI photo review.<br>- Fix significant issues before the final demo. |
+| **Alpha Checkpoint – Nov 23** | - Deployed app with integrated Bun/MongoDB backend and Vue frontend with authentication, household management, scheduling, and manual photo-review infrastructure.<br>- Resident interfaces for tasks, availability, preferences, calendar, photo submissions, and swaps, currently using mock data.<br>- Overseer review queue and household creation interface.<br>- Remaining work: resolve API mismatches, complete missing frontend functionality, and verify the full manual workflow end-to-end. |
+| **Beta Checkpoint – Dec 2** | - Complete and validate frontend/backend integration for household management, chore creation, scheduling, and photo verification.<br>- Complete CompletionChecking composition with task details, review, and review queues.<br>- Implement AI-assisted photo review through Reasoning, with feedback and referral of uncertain results to the Overseer.<br>- Support opt-in AI review with manual review always available.<br>- Polish existing frontend screens, ensure complete connection to household, scheduling, availability, preference, photo upload, and completion APIs.<br>- Add support for swap interactions through new Trading concept. |
+| **User Testing – Dec 7** | - Test the complete workflow with a small household: create chores, set availability, schedule tasks, submit photos, and review completion.<br>- Compare AI and manual review accuracy, speed, and usability.<br>- Record incorrect decisions, confusing interactions, and integration failures.<br>- Fix significant issues before the final demonstration. |
 
 ## Responsibilities
 
-* Ivan: ChoreCataloguing, TaskTracking (Ada support on both)
-* Hunnaid: CompletionChecking, PhotoTracking, Reasoning, Ranking (Rowan support on both)
-* Ada: ChoreAssignments, Scheduling (Ivan support on both)
-* Rowan: Copying User & Roling stuff over, Bounties, UI design (Ada support on UI)
+* **Ivan:** AI verification (Reasoning), consent integration, and AI review frontend.
+* **Hunnaid:** Household and chore management interfaces, frontend/backend API integration.
+* **Ada:** CompletionChecking integration, PhotoChecking, Ranking, and manual review workflow.
+* **Rowan:** Task scheduling interfaces, availability and preferences, resident UI polish.
+* **Everyone:** Participate in end-to-end user testing to examine clunky, missing, or broken functionality.
 
-Users, Authenticating, Sessioning, Registering, and Roling can be adapted/copied from previous designs.
+Existing Registering, Authenticating, HouseholdManaging, ChoreCataloguing, and TaskScheduling implementations should be reused rather than redesigned. Recurring chores, notifications, and bounties are currently lower-priority extensions. If it seems likely, they will be appended to the Beta scope.
 
-These represent primary responsibility. Everyone will contribute approximately equally to the design, implementation, and code review.
+These represent primary responsibilities. Everyone will contribute approximately equally to design, implementation, testing, and code review.
 
-## Risk & fallback options
+## Risks and Fallback Options
 
-* Photos are reused or do not show enough of the completed chore.
-    - Mitigation: Provide clear photo instructions and a baseline example showing the expected result. Let members preview and retake photos if needed. Taking a photo in the app reduces the risk of someone reusing a photo.
-    - Fallback: The Overseer can reject the photo and request another photo or a better angle.
-* AI integration becomes unreliable.
-    - Mitigation: Test complete, incomplete, and badly framed against the Overseer’s judgement. Send uncertain results for manual review and let the Overseer correct decisions.
-    - Fallback: Disable automatic approval and use AI only for suggestions, or return to the manual workflow established in the Alpha.
-* Time saved between manually verifying and AI reviewing is little to none.
-    - Mitigation: Compare the current process, the app’s manual review queue, and AI review. Consider the number of times AI is uncertain when comparing whether AI is useful or not for review.
-    - Fallback: Focus on the manual review workflow, where photos, assignments, and completion decisions stay together. Keep AI optional if it doesn’t provide a significant benefit.
+| Risk | Mitigation | Fallback |
+|---|---|---|
+| Resident screens still use mock data. | Connect the core screens to the live scheduling, photo upload, and completion APIs first. Verify the browser workflow from task assignment through resident submission and overseer review. | Limit the demo to workflows verified against the live backend. |
+| Migrating the remaining completion routes could break approval retries or evidence access. | Test that only authorized users can view evidence, retries use the original submission time, and each task earns credit once even after a partial failure. | Keep the existing HTTP routes for task details, review, and the review queue until their replacements pass the same tests. |
+| AI review may be unreliable or unfinished. | Keep AI review opt-in. Compare assessments with human decisions, and route uncertain, failed, or malformed assessments to the overseer. Test that withdrawing consent stops pending AI review. | Disable AI review and use the manual review workflow. |
+| Photos may be reused or may fail to show the completed chore. | Give residents clear criteria, baseline examples where available, and a preview before submitting. | Let the overseer reject the attempt with feedback and let the resident submit new evidence. |
+| Optional work may delay the core Beta workflow. | Prioritize household and chore setup, scheduling, resident submission, and overseer review before adding optional features. | Defer swaps, recurring chores, notifications, and bounties. |

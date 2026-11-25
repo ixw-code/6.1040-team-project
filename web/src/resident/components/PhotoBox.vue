@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Render a saved image or a placeholder for a missing reference.
+// Displays a stored or locally previewed photo, or a placeholder when no photo is available.
 defineProps<{ url: string | null; label: string; text?: string }>();
 </script>
 

@@ -8,7 +8,7 @@ PhotoChecking stores submissions and decisions. TaskScheduling records task comp
 
 A signed-in resident can submit evidence for an active task assigned to them in their household. The submission endpoint checks the session and assignment before recording the photo. The session identifies the submitter, so a resident cannot submit under another person’s identity.
 
-The server accepts evidence from the scheduled start through the scheduled end of that task occurrence. Each occurrence of a weekly assignment has its own window. An early submission receives `SUBMISSION_NOT_OPEN`, and a late submission receives `SUBMISSION_CLOSED`. The server records the time it used to make this check.
+The server accepts evidence from the scheduled start through the scheduled end of that task occurrence. Each occurrence of a weekly assignment has its own window. The reaction refuses early submissions with `SUBMISSION_NOT_OPEN` and late submissions with `SUBMISSION_CLOSED`. Both map to HTTP 409 `CONFLICT`. The server records the time it used to make this check.
 
 The resident uploads the image first and receives a photo ID. Submitting that ID attaches the stored image to the task after CompletionChecking verifies that the signed-in resident uploaded it.
 
@@ -62,6 +62,21 @@ CompletionChecking uses the login cookie to identify the caller. `POST` routes a
 
 The application reads tasks and assignments from TaskScheduling, membership and oversight from HouseholdManaging, and evidence instructions from ChoreCataloguing.
 
+## Registered manual submission
+
+The [Submit endpoint](reaction:CompletionChecking.Submit) uses the [CanSubmit view](view:CompletionChecking.CanSubmit) to verify that the signed-in resident is assigned to an active, incomplete task with a scheduled window and owns the uploaded photo. Missing or unauthorized resources return `NOT_FOUND`. The reaction binds the server’s current instant, checks the scheduled window, and passes that same instant to `PhotoChecking.submit`.
+
+```endpoints
+CompletionChecking.Submit at /completion/submit
+```
+
+```computations
+evidenceInstructions(requirements: Requirements, references: Photos) : EvidenceInstructions
+  Joins the current requirements and selects the first baseline reference when supplied.
+evidenceWindow(interval: Interval, submittedAt: DateTime) : EvidenceWindow
+  Determines whether the submitted time is before, inside, or after the occurrence’s scheduled interval, including both endpoints.
+```
+
 ## Choosing AI review - Beta
 
 When submitting a photo, the resident chooses manual review or automatic AI review. Manual review sends the submission directly to the Overseer’s review queue. AI review creates an assessment request through Reasoning and requires the resident’s consent.
@@ -74,7 +89,7 @@ Selecting AI review without consent is refused with `NOT_CONSENTED`. Manual and 
 
 Turning AI review off calls `PhotoChecking.sendToOverseer` for pending AI submissions and abandons their waiting assessment requests through `Reasoning.abandon`, recording that AI review was turned off. (`CompletionChecking.StopPendingAIReviews`)
 
-```endpoints
+```text
 CompletionChecking.EnableAI at /completion/ai/on
 CompletionChecking.DisableAI at /completion/ai/off
 ```
@@ -89,7 +104,7 @@ Evidence is returned only while the task is active, the submission is current an
 
 The agent calls the model and records its answer through Reasoning. The answer must include an `approved` or `needs_review` outcome, a finding for each criterion, and feedback explaining the result.
 
-```endpoints
+```text
 CompletionChecking.ReadAssessmentEvidence at /completion/agent/evidence
 ```
 

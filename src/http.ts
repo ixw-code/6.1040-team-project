@@ -15,7 +15,11 @@ export const policy = httpPolicy({
   publicOrigin: process.env.PUBLIC_ORIGIN ?? (process.env.NODE_ENV === "production"
     ? "https://shift-happens.mit-sdg.dev" : "http://localhost:5173"),
   basePath: "/api",
-  publicErrors: { ...accountsHttp.publicErrors, ...passwordsHttp.publicErrors, ...householdHttpErrors, ...assignmentHttpErrors },
+  publicErrors: {
+    ...accountsHttp.publicErrors, ...passwordsHttp.publicErrors, ...householdHttpErrors, ...assignmentHttpErrors,
+    ALREADY_PENDING: "CONFLICT", ALREADY_APPROVED: "CONFLICT",
+    SUBMISSION_NOT_OPEN: "CONFLICT", SUBMISSION_CLOSED: "CONFLICT",
+  },
   cookies: {
     session: accountsHttp.sessionCookie(sessionCookieName, passwordsHttp.startingSessions),
   },
