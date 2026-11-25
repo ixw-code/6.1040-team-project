@@ -10,10 +10,10 @@ import { taskScheduling } from "./concepts/TaskScheduling/registry.ts";
 
 import {
     assignmentDate, assignmentInterval,
-    assignmentPeople, matchesPersonalTask,
+    assignmentPeople, matchesPersonalTask, availabilityWindows, assignmentCategory, activeChorePreferences,
 } from "./helpers/assignments.ts";
 
-import { evidenceInstructions } from "./helpers/evidenceInstructions.ts";
+import { evidenceInstructions, evidenceWindow } from "./helpers/evidenceInstructions.ts";
 
 export const applicationConceptSet = conceptSet({
     HouseholdManaging: householdManaging,
@@ -25,8 +25,8 @@ export const applicationConceptSet = conceptSet({
     Authenticating: authenticating, 
     Sessioning: sessioning
 }, {
-    evidenceInstructions,
+    evidenceInstructions, evidenceWindow,
     assignmentDate, assignmentInterval,
-    assignmentPeople, matchesPersonalTask,
+    assignmentPeople, matchesPersonalTask, availabilityWindows, assignmentCategory, activeChorePreferences,
 });
 export const { concepts, computations } = applicationConceptSet;

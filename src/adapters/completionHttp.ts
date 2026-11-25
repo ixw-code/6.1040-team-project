@@ -12,9 +12,10 @@ export type CompletionTask = {
   title: string;
   criteria: string;
   photoInstructions: string;
-  baseline: string;
+  baseline?: string;
   dueAt: Date;
   active: boolean;
+  archived?: boolean;
   completed: boolean;
 };
 
@@ -26,59 +27,54 @@ export type TaskCompletion = {
   reviewedAt: Date;
 };
 
-// Adapt the task, role, and completion operations used by the HTTP handler.
+// Task and membership lookups are supplied by the scheduling and household concepts.
 export interface CompletionHooks {
   task(task: string): CompletionTask | undefined | Promise<CompletionTask | undefined>;
   role(household: string, person: string): HouseholdRole | undefined | Promise<HouseholdRole | undefined>;
+  householdTasks?(household: string): Promise<{ task: string }[]>;
   recordCompletion(completion: TaskCompletion): Promise<void>;
 }
 
-export function createCompletionHooks({
-  TaskScheduling, HouseholdManaging, ChoreCataloguing,
-}: ReturnType<typeof assembleApplication>["concepts"]): CompletionHooks {
+type Concepts = ReturnType<typeof assembleApplication>["concepts"];
+
+export function createCompletionHooks({ TaskScheduling, ChoreCataloguing, HouseholdManaging }: Concepts): CompletionHooks {
   return {
+    householdTasks: household => TaskScheduling._tasks({ group: household }),
     async task(task) {
       const [entry] = await TaskScheduling._completionContext({ task });
       if (!entry) return;
       const [chore] = await ChoreCataloguing._get({ chore: entry.item });
-      const details = chore?.group === entry.group ? chore : undefined;
-      const { dueAt } = entry;
+      if (!chore || chore.group !== entry.group) return;
       const completed = entry.completion === "COMPLETED";
       return {
-        task,
-        household: entry.group,
-        assignee: entry.assignee ?? "",
-        title: details?.name ?? "Chore",
-        criteria: details?.requirements.join("\n") ?? "",
-        photoInstructions: details?.description ?? "",
-        baseline: details?.references[0] ?? "",
-        dueAt,
-        active: !completed && entry.assignee !== undefined,
-        completed,
+        task, household: entry.group, assignee: entry.assignee ?? "", title: chore.name,
+        criteria: chore.requirements.join("\n"), photoInstructions: chore.description,
+        baseline: chore.references[0], dueAt: entry.dueAt,
+        active: !entry.archived && !completed && entry.assignee !== undefined, archived: entry.archived, completed,
       };
     },
     async role(household, person) {
       const [home] = await HouseholdManaging._household({ household });
       if (!home) return;
       if (home.overseer === person) return "OVERSEER";
-      if ((await HouseholdManaging._allResidents({ household, people: [person] })).all) return "RESIDENT";
+      const members = await HouseholdManaging._residents({ household });
+      if (members.some(member => member.person === person)) return "RESIDENT";
     },
     async recordCompletion({ task, person, submittedAt }) {
-      try {
-        const result = await TaskScheduling.complete({ task, completedBy: person, completedAt: submittedAt });
-        if ("error" in result) throw result;
-      } catch (error) {
-        if (!error || typeof error !== "object" || !("error" in error) || error.error !== "TASK_STATUS_CONFLICT") throw error;
-        const [entry] = await TaskScheduling._get({ task });
-        if (entry?.completedBy !== person || entry.completedAt?.getTime() !== submittedAt.getTime()) throw error;
+      const result = await TaskScheduling.complete({ task, completedBy: person, completedAt: submittedAt });
+      if (!("error" in result)) return;
+      // A retry of the same approval must still reach the idempotent ranking credit.
+      const [entry] = await TaskScheduling._get({ task });
+      if (entry?.completedBy !== person || entry.completedAt?.getTime() !== submittedAt.getTime()) {
+        throw new Error("Unable to record task completion.");
       }
     },
   };
 }
 
 const prefix = "/api/completion/";
-const paths = new Set(["submit", "get", "review", "review-queue"].map((name) => prefix + name));
-const submissionPhotoPath = /^\/api\/completion\/submissions\/([\da-f-]{36})\/photo$/;
+const paths = new Set(["get", "review", "review-queue", "reviewed"].map((name) => prefix + name));
+const submissionPhotoPath = /^\/api\/completion\/submissions\/([\da-f-]{36})\/(photo|baseline)$/;
 const errorCodes = {
   400: "INVALID_REQUEST",
   401: "UNAUTHORIZED",
@@ -118,17 +114,13 @@ function parseInput(operation: string, input: unknown) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return;
   const body = input as Record<string, unknown>;
   const only = (...fields: string[]) => Object.keys(body).every((key) => fields.includes(key));
-  const { task, photo, household, submission, decision, feedback = "" } = body;
+  const { task, household, submission, decision, feedback = "" } = body;
 
   switch (operation) {
-    case "submit":
-      if (only("task", "photo") && nonblank(task) && nonblank(photo)) {
-        return { operation, task, photo };
-      }
-      return;
     case "get":
       if (only("task") && nonblank(task)) return { operation, task };
       return;
+    case "reviewed":
     case "review-queue":
       if (only("household") && nonblank(household)) return { operation, household };
       return;
@@ -179,7 +171,7 @@ export function createCompletionHandler(
     const items = [];
     for (const { submission, subject } of await PhotoChecking._pending({ method: "MANUAL" })) {
       const task = await taskById(subject);
-      if (!task || task.household !== household) continue;
+      if (!task || task.archived || task.household !== household) continue;
       const [details] = await PhotoChecking._submission({ submission });
       if (!details || details.status !== "PENDING" || details.reviewMethod !== "MANUAL") continue;
       const { person, photo, criteria, baseline, submittedAt } = details;
@@ -190,7 +182,7 @@ export function createCompletionHandler(
 
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
-    const attachment = submissionPhotoPath.exec(path)?.[1];
+    const attachment = submissionPhotoPath.exec(path);
     if (!attachment && !paths.has(path)) return failure(404);
     if (!allowsAppOrigin(request)) return failure(403);
     if (request.method !== (attachment ? "GET" : "POST")) return failure(400);
@@ -201,13 +193,15 @@ export function createCompletionHandler(
       if (!hooks) return failure(503);
 
       if (attachment) {
-        const [details] = await PhotoChecking._submission({ submission: attachment });
+        const [details] = await PhotoChecking._submission({ submission: attachment[1] });
         const task = details && await hooks.task(details.subject);
         if (!task) return failure(404);
         const role = await hooks.role(task.household, person);
         if (role !== "OVERSEER" && (role !== "RESIDENT" || details.person !== person)) return failure(404);
         // Resolve the file from the authorized submission, including the original uploader.
-        const stored = await photos.read(details.photo, details.person);
+        const { baseline, photo, person: uploader } = details;
+        const stored = attachment[2] === "baseline"
+          ? baseline && await photos.readReference(baseline) : await photos.read(photo, uploader);
         return stored ? photoResponse(stored) : failure(404);
       }
 
@@ -217,17 +211,6 @@ export function createCompletionHandler(
       if (!input) return failure(400);
 
       switch (input.operation) {
-        case "submit": {
-          const task = await hooks.task(input.task);
-          if (!task?.active || task.assignee !== person || !await hooks.role(task.household, person)) {
-            return failure(404);
-          }
-          if (!await photos.owns(input.photo, person)) return failure(404);
-          const result = await PhotoChecking.submit({
-            subject: task.task, person, photo: input.photo, criteria: task.criteria, baseline: task.baseline, method: "MANUAL",
-          });
-          return "error" in result ? refusal(result.error) : json(result);
-        }
         case "get": {
           const task = await hooks.task(input.task);
           if (!task) return failure(404);
@@ -237,12 +220,28 @@ export function createCompletionHandler(
         case "review-queue":
           if (await hooks.role(input.household, person) !== "OVERSEER") return failure(404);
           return await listQueue(input.household, (id) => hooks.task(id));
+        case "reviewed": {
+          if (await hooks.role(input.household, person) !== "OVERSEER") return failure(404);
+          const items = [];
+          for (const { task } of await hooks.householdTasks?.(input.household) ?? []) {
+            const entry = await hooks.task(task);
+            if (!entry) continue;
+            for (const row of await PhotoChecking._history({ subject: task })) {
+              if (row.status === "PENDING") continue;
+              const [details] = await PhotoChecking._submission({ submission: row.submission });
+              if (details) items.push({ ...details, ...row, task, title: entry.title });
+            }
+          }
+          items.sort((a, b) => b.reviewedAt!.getTime() - a.reviewedAt!.getTime());
+          return json({ queue: { items } });
+        }
         case "review": {
           const { submission, decision, feedback } = input;
           let [details] = await PhotoChecking._submission({ submission });
           if (!details) return failure(404);
           const task = await hooks.task(details.subject);
           if (!task || await hooks.role(task.household, person) !== "OVERSEER") return failure(404);
+          if (task.archived && details.status !== "APPROVED") return failure(404);
 
           if (decision === "REJECT") {
             const result = await PhotoChecking.reject({ submission, reviewer: person, reason: feedback });

@@ -11,7 +11,6 @@ export type Screen =
   | { name: "photo"; taskId: string; file: File }
   | { name: "attempt"; taskId: string; attemptId: string }
   | { name: "image"; url: string | null; label: string }
-  | { name: "availabilityForm" }
   | { name: "swap"; taskId: string };
 
 const BACK_LABEL: Record<Screen["name"], string> = {
@@ -24,7 +23,6 @@ const BACK_LABEL: Record<Screen["name"], string> = {
   photo: "Photo",
   attempt: "Attempt",
   image: "Back",
-  availabilityForm: "Availability",
   swap: "Swap",
 };
 

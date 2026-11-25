@@ -47,6 +47,9 @@ export function createPhotoStore(db: Db) {
     async owns(photo: string, owner: string): Promise<boolean> {
       return Boolean(await photos.findOne({ _id: photo, owner }, { projection: { _id: 1 } }));
     },
+    readReference(photo: string) {
+      return photos.findOne({ _id: photo });
+    },
     read(photo: string, owner: string) {
       return photos.findOne({ _id: photo, owner });
     },

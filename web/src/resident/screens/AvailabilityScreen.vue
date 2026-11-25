@@ -1,82 +1,83 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import ScopeToggle from "../components/ScopeToggle.vue";
-import WeekGrid from "../components/WeekGrid.vue";
-import { startOfDay, timeRange } from "../display.ts";
-import { useNav } from "../nav.ts";
-import { getAvailability, getPeople } from "../residentApi.ts";
-import type { AvailabilityBlock, Person } from "../types.ts";
+import { onMounted, ref } from "vue";
+import { mondayFirstWeekdays } from "../../../../src/shared/assignmentDates.ts";
+import {
+  availabilityLabels, availabilityLevels, type WeekAvailability,
+} from "../../../../src/shared/weeklyAvailability.ts";
+import { api } from "../../api.ts";
+import { checked, useHousehold } from "../../household.ts";
 
-const nav = useNav();
-const onlyMe = ref(false);
-const blocks = ref<AvailabilityBlock[]>([]);
-const people = ref<Person[]>([]);
+const { home, person } = useHousehold();
+const household = home.household;
+const days = ref<WeekAvailability>();
 const loading = ref(true);
-
-const from = startOfDay(new Date());
-const failed = ref(false);
+const busy = ref(false);
+const error = ref("");
+const message = ref("");
 
 onMounted(async () => {
-  const until = new Date(from); until.setDate(until.getDate() + 7);
   try {
-    [blocks.value, people.value] = await Promise.all([getAvailability(from, until), getPeople()]);
-  } catch {
-    failed.value = true;
+    const result = checked(await api.assignments.availability.weekly({ household, person }));
+    days.value = result.days ?? {
+      Monday: "NOT_AVAILABLE", Tuesday: "NOT_AVAILABLE", Wednesday: "NOT_AVAILABLE",
+      Thursday: "NOT_AVAILABLE", Friday: "NOT_AVAILABLE", Saturday: "NOT_AVAILABLE", Sunday: "NOT_AVAILABLE",
+    };
+  } catch (e) {
+    error.value = (e as Error).message;
   } finally {
     loading.value = false;
   }
 });
 
-/** You first, then everyone else; each person gets a fixed lane. */
-const shownPeople = computed(() => {
-  const ordered = [...people.value].sort((a, b) => Number(b.isMe) - Number(a.isMe));
-  return onlyMe.value ? ordered.filter((p) => p.isMe) : ordered;
-});
-const items = computed(() => {
-  const lanes = shownPeople.value.length;
-  return shownPeople.value.flatMap((person, lane) =>
-    blocks.value.filter((b) => b.personId === person.id).map((b) => ({ ...b, lane, lanes, person })));
-});
+async function save() {
+  if (!days.value || busy.value) return;
+  busy.value = true;
+  error.value = "";
+  message.value = "";
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  try {
+    const { freed } = checked(await api.assignments.availability.weekly.set({ household, days: days.value, timeZone }));
+    message.value = freed.length
+      ? `Weekly availability saved. ${freed.length} ${freed.length === 1 ? "task is" : "tasks are"} now unassigned.`
+      : "Weekly availability saved.";
+  } catch (e) {
+    error.value = (e as Error).message;
+  } finally {
+    busy.value = false;
+  }
+}
 </script>
 
 <template>
   <section class="rs-screen">
-    <header class="head">
-      <h1 class="rs-title rs-heading title">Availability</h1>
-      <ScopeToggle v-model="onlyMe" what="availability" />
-    </header>
-
-    <!-- Alpha: adding/removing happens on a separate screen rather than by dragging on the grid. -->
-    <div class="actions">
-      <button type="button" class="rs-pill rs-heading" @click="nav.go({ name: 'availabilityForm' })">+ Add Time</button>
-      <button type="button" class="rs-pill rs-pill--light rs-heading" @click="nav.go({ name: 'availabilityForm' })">− Remove Time</button>
-    </div>
-
-    <ul class="legend" aria-label="Who's who">
-      <li v-for="p in shownPeople" :key="p.id"><span class="swatch" :style="{ background: p.color }" />{{ p.isMe ? "You" : p.name }}</li>
-    </ul>
-
-    <p v-if="failed" class="rs-status-line rs-hand rs-error">Couldn't load availability. Try again.</p>
-    <p v-else-if="loading" class="rs-status-line rs-hand">Loading…</p>
-    <WeekGrid v-else :items="items" :from="from" :hour-px="34">
-      <template #item="{ item }">
-        <div class="block" role="img" :style="{ background: item.person.color }" :aria-label="`${item.person.name} free ${timeRange(item.start, item.end)}`">
-          <span v-if="!onlyMe" class="rs-heading initial">{{ (item.person.isMe ? "You" : item.person.name).charAt(0) }}</span>
-          <span v-else class="rs-serif">{{ timeRange(item.start, item.end) }}</span>
-        </div>
-      </template>
-    </WeekGrid>
+    <h1 class="rs-title rs-heading">My availability</h1>
+    <p>Choose your availability for a typical week.</p>
+    <dl class="availability-guide">
+      <dt>Available</dt><dd>I can take a task on this day every week.</dd>
+      <dt>Somewhat available</dt><dd>I can sometimes take a task on this day.</dd>
+      <dt>Not available</dt><dd>I’m busy on this day each week.</dd>
+    </dl>
+    <p v-if="loading">Loading availability…</p>
+    <p v-if="error" class="rs-error" role="alert">{{ error }}</p>
+    <form v-if="days" class="availability-form" @submit.prevent="save">
+      <ul class="rs-paper">
+        <li v-for="{ name } in mondayFirstWeekdays" :key="name" class="schedule-row">
+          <label :for="`availability-${name}`">{{ name }}</label>
+          <select :id="`availability-${name}`" v-model="days[name]" :disabled="busy" @change="message = ''">
+            <option v-for="level in availabilityLevels" :key="level" :value="level">{{ availabilityLabels[level] }}</option>
+          </select>
+        </li>
+      </ul>
+      <button class="rs-pill rs-heading" :disabled="busy">Save availability</button>
+    </form>
+    <p v-if="message" role="status">{{ message }}</p>
   </section>
 </template>
 
 <style scoped>
-.head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.title { font-size: 2.2rem; }
-.actions { display: flex; gap: 10px; max-width: 460px; }
-.actions .rs-pill { flex: 1; font-size: 1.2rem; }
-.legend { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14px; }
-.legend li { display: flex; align-items: center; gap: 5px; }
-.swatch { width: 12px; height: 12px; box-shadow: 0 1px 2px rgba(0, 0, 0, .4); }
-.block { padding: 4px 3px; overflow: hidden; text-align: center; color: var(--rs-ink); font-size: 12px; box-shadow: 0 3px 6px rgba(0, 0, 0, .35); }
-.initial { display: block; font-size: 15px; line-height: 1; }
+.availability-guide { display: grid; gap: .3rem .8rem; margin: 0; grid-template-columns: max-content minmax(0, 1fr); }
+.availability-guide dt { font-weight: bold; }
+.availability-guide dd { margin: 0; }
+.availability-form { display: grid; gap: 1rem; max-width: 36rem; }
+.availability-form > button { justify-self: start; }
 </style>

@@ -47,8 +47,17 @@ Status is PENDING or OVERDUE or COMPLETED or COMPLETED_LATE
 CompletionState is INCOMPLETE or COMPLETED
   Whether the task has a recorded completion.
 
+opaque WeekAvailability
+  A level for each weekday. Levels are available, somewhat available, and not available.
+
+opaque IntervalSet
+  A list of time intervals.
+
 opaque PersonSet
   A set of rows, each with a person: Person.
+
+opaque ChorePreferenceSet
+  A set of rows with a person and their ordered list of chore items.
 
 opaque PreferenceSet
   A set of rows, each with person: Person, preferenceLevel: PreferenceLevel, and category: Category.
@@ -70,10 +79,17 @@ a set of Availabilities with
   a person Person
   an interval Interval
 
+a set of WeeklyAvailabilities with
+  a group Group
+  a person Person
+  a days WeekAvailability
+  a timeZone String
+  unique group and person
+
 a set of Tasks with 
   a group Group
   an item Item
-  a category Category
+  an optional category Category
   a weight Number
   an optional deadline DateTime
   an optional interval Interval
@@ -81,6 +97,9 @@ a set of Tasks with
   an optional source Source
   an optional completedBy Person
   an optional completedAt DateTime
+  an optional archived Flag
+  an optional timeZone String
+  an optional flexibleDays Flag
 
 Rule: all stored timestamps are valid DateTime values
 Rule: every interval must have start before end
@@ -90,8 +109,13 @@ Rule: a task's weight is a positive float between 1-10, inclusive
 Rule: a task has an assignee exactly when it has a source
 Rule: a task with an assignee must have a scheduled interval
 Rule: a task must have either a deadline or a scheduled interval
-Rule: a person is 'available' for a task when their availability intervals in the group completely cover the task's scheduled interval 
-Rule: all pending tasks' assignees must be available for the task's scheduled interval
+Rule: a saved weekly pattern determines availability on the day a specific-day task starts in its scheduling time zone
+Rule: a flexible task uses the highest availability level across days with time inside its window
+Rule: for tasks without a stored zone, use the resident's saved zone
+Rule: if a resident has no weekly pattern, a flexible task requires an overlapping availability interval and a specific-day task requires full interval coverage
+Rule: assigned standalone pending tasks require an available or somewhat available day, or legacy interval coverage
+Rule: weekly assignments keep the same assignee across their open occurrences until an overseer makes another assignment decision or the assignee leaves
+Rule: completed occurrences retain their recorded completion when open occurrences change assignee
 
 Rule: a task must have completedBy set exactly when it has completedAt set
 Rule: a task is completed when it has both completedBy and completedAt
@@ -105,7 +129,7 @@ Rule: a person's total assigned workload in a group is the sum of all weights of
 
 ## Actions 
 ```actions
-add(group: Group, item: Item, category: Category, weight: Number, deadline?: DateTime, interval?: Interval): returns (task: Task)
+add(group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval): returns (task: Task)
   where weight is nonfinite or outside [1, 10]
   then
     refuses TASK_WEIGHT_INVALID "Task weight must be between 1 and 10."
@@ -119,6 +143,34 @@ add(group: Group, item: Item, category: Category, weight: Number, deadline?: Dat
     create a new task with group, item, category, weight,
       deadline, interval, no assignee, no source,
       no completedBy, and no completedAt
+    returns task
+
+addBatch(group: Group, item: Item, category?: Category, weight: Number, intervals: IntervalSet, batchId: String, repeatWeekly?: Flag, flexibleDays?: Flag, timeZone?: String): returns (tasks: TaskSet)
+  where weight is nonfinite or outside [1, 10]
+  then
+    refuses TASK_WEIGHT_INVALID "Task weight must be between 1 and 10."
+  where the batch has fewer than 1 or more than 104 intervals, any interval has invalid start or end times, the supplied zone is invalid, or weekly intervals overlap
+  then
+    refuses TASK_INTERVAL_INVALID "Provide between 1 and 104 valid task intervals with no overlap between weekly occurrences."
+  where the batch is valid and the group has already used the request ID
+  then
+    use the task IDs from the original batch
+    returns tasks
+  where the batch is valid and the request ID is new for the group
+  then
+    atomically create one unassigned task per interval with the same item, category and weight
+    set each deadline to the end of its interval and record the zone and flexible-day status when supplied
+    save the task IDs and whether they form one weekly assignment with the request ID
+    returns tasks
+
+archiveAssignment(group: Group, task: Task): returns (task: Task)
+  where task does not exist in group
+  then
+    refuses TASK_NOT_FOUND "This task doesn't exist in the schedule."
+  where task exists in group
+  then
+    archive the task and all other occurrences of its weekly series if any
+    retain evidence links and any recorded completion for review history
     returns task
 
 remove(task: Task): returns (task : Task)
@@ -155,18 +207,28 @@ updateInterval(task: Task, interval?: Interval): returns (task: Task)
   where task is already completed 
   then
     refuses TASK_STATUS_CONFLICT "A completed task cannot be rescheduled."
-  where any of the following holds: interval is given and a timestamp is invalid or start is not before its end; interval is given and task deadline is before interval's end; interval is None and task deadline is None
+  where any of the following holds: interval is given and a timestamp is invalid or start is not before its end; interval is given and task deadline is before interval's end; interval is None and either the task deadline is None or the task belongs to a weekly assignment; interval overlaps another occurrence of the same weekly assignment
   then
-    refuses TASK_INTERVAL_INVALID "Provide a valid interval that ends by the deadline, or keep a deadline when clearing the interval."
-  where interval is None and task has a deadline
+    refuses TASK_INTERVAL_INVALID "Provide a valid interval that ends by the deadline, or keep a deadline when clearing a standalone interval."
+  where interval is None and task has a deadline and is standalone
   then
     clear task assignee, interval, and source to None
     returns task
   where interval is valid
   then
     update task interval
-    if current assignee is unavailable for the new interval, then clears task's assignee and source to None
+    for standalone tasks, clear assignee and source if the current assignee is unavailable for the new interval
     returns task
+
+setWeeklyAvailability(group: Group, person: Person, days: WeekAvailability, timeZone: String): returns (freed: TaskSet)
+  where a weekday has no valid level or the time zone is invalid
+  then
+    refuses WEEKLY_AVAILABILITY_INVALID "Provide an availability level for every weekday and a valid time zone."
+  where the weekly pattern and time zone are valid
+  then
+    save the pattern and zone for this person
+    clear their open standalone assignments where they selected not available
+    returns freed
 
 addAvailability(group: Group, person: Person, start: DateTime, end: DateTime): returns (availability: Availability)
   where start or end is invalid or start is not before end
@@ -177,6 +239,16 @@ addAvailability(group: Group, person: Person, start: DateTime, end: DateTime): r
     add a new availability with the group, person, and interval [start, end)
     returns availability
 
+editAvailability(group: Group, person: Person, windows: IntervalSet, adding: Flag): returns (freed: TaskSet)
+  where windows is empty or contains an invalid interval
+  then
+    refuses TASK_INTERVAL_INVALID "Each availability window must end after it starts."
+  where all windows are valid
+  then
+    atomically adds coverage or subtracts the windows from this person's availability
+    when subtracting, clear incomplete standalone assignments that no longer have full coverage
+    returns freed
+
 removeAvailability(availability: Availability): returns (freed: TaskSet)
   where availability doesn't exist
   then
@@ -184,39 +256,38 @@ removeAvailability(availability: Availability): returns (freed: TaskSet)
   where availability exists
   then
     remove availability
-    clear person and source from every task not already completed and previously assigned to person in group that they are no longer available for
+    clear person and source from each affected standalone task that is open and no longer covered by availability
     returns freed
 
 removePerson(group: Group, person: Person): returns (freed: TaskSet)
   where true
   then
-    remove all availabilities for person in group
+    remove weekly availability and legacy intervals for person in group
     clear assignee and source from tasks not already completed and previously assigned to person in group
     if person has no availability or incomplete assignments in group, no changes are made
     returns freed
 
-autoSchedule(group: Group, from: DateTime, until: DateTime, people: PersonSet, preferences: PreferenceSet, onlyUnassigned: Flag ): returns ( scheduled: ScheduledTaskSet, unassigned: TaskSet)
+autoSchedule(group: Group, from: DateTime, until: DateTime, people: PersonSet, preferences: PreferenceSet, chorePreferences?: ChorePreferenceSet, onlyUnassigned: Flag ): returns ( scheduled: ScheduledTaskSet, unassigned: TaskSet)
   where from or until is invalid or from is not before until
   then
     refuses SCHEDULE_WINDOW_INVALID "The period must end after it starts."
-  where a preference has an invalid level, references a person not in people, or conflicts with another level for the same person and category
+  where a preference has an invalid level, references a person not in people, conflicts with another level for the same person and category, or a chore ranking repeats a person or item
   then
     refuses PREFERENCES_INVALID "The supplied preferences are invalid."
   where [from, until) is a valid interval
   then
-    if onlyUnassigned is false
-      clear assignee and source from every incomplete task in group
-      whose scheduled interval starts in [from, until) and whose source is AUTO
-    for each incomplete task in group whose interval start is in [from, until) in order of start, breaking equal starts by task identity:
-      if task source is MANUAL or (onlyUnassigned is true and task has an assignee)
-        skip rescheduling for this task 
-      otherwise
-      among people from the supplied set available for the job, choose the one with the lowest
-        cost = their total + the job's weight × (0.5 if prefer, 1 if neutral, 2 if avoid),
-        breaking remaining ties at random
-      if someone was chosen, set the job's assignee to them and its source to AUTO, and include the task's weight in their workload before considering the next task
-      otherwise leave the task unassigned
-    include only considered tasks in the results, in the order considered
+    consider each assignment with an open occurrence whose interval starts in [from, until) or overlaps it as a flexible window
+    if onlyUnassigned is false, clear automatic assignments on all open occurrences of any considered assignment without manual assignees
+    process assignments in order of their first open occurrence in the window
+    skip assignments with any remaining assignee
+    group eligible people by their lowest availability level across the open occurrences
+    consider the available group first and then the somewhat available group if needed
+    choose the lowest cost based on workload, chore weight, and the resident's chore ranking
+    use a multiplier of 0.5 for first to 1.5 for last, or 1 for unranked chores
+    use legacy category preferences only for residents who have no chore ranking
+    break ties at random
+    when someone is chosen, assign all open occurrences to that person and update workload for each task
+    include one representative task for each considered assignment that gets assigned or remains unassigned
     returns scheduled, unassigned
 
 setSchedule(group: Group, entries: ScheduleEntrySet): returns (entries: ScheduleEntrySet)
@@ -229,15 +300,16 @@ setSchedule(group: Group, entries: ScheduleEntrySet): returns (entries: Schedule
   where some entry's task doesn't have a scheduled interval
   then
     refuses TASK_INTERVAL_INVALID "Task must have a scheduled interval before assignment."
-  where entries specify different assignees for the same task, including assignment versus unassignment
+  where entries specify different assignees for the same task or weekly assignment, including assignment versus unassignment
   then
     refuses SCHEDULE_ENTRIES_INVALID "A task cannot have conflicting assignments in one batch."
-  where some entry's person is given and is not available for its job
+  where a standalone task has an ineligible assignee or a requested weekly assignee marked any open occurrence's day not available
   then
     refuses PERSON_NOT_AVAILABLE "An assignee is not available for this task."
   where the batch passes all preceding checks
   then
-    for every entry:
+    apply each weekly entry to every open occurrence of that assignment
+    for every affected task:
       if an assignee is given
         set the task's assignee to the entry's assignee and set source to MANUAL,
       otherwise
@@ -250,7 +322,8 @@ reset(group: Group, from: DateTime, until: DateTime) : returns (cleared: TaskSet
     refuses SCHEDULE_WINDOW_INVALID "The period must end after it starts."
   where from is before until
   then
-    clear assignee and source from every incomplete task in group whose scheduled interval starts in [from, until) and whose source is AUTO
+    consider assignments with an open occurrence whose interval starts in [from, until) or overlaps it as a flexible window
+    if the assignment has no manual assignee, clear assignee and source from all its open automatic occurrences
     returns cleared
 
 complete(task: Task, completedBy: Person, completedAt: DateTime): returns (task: Task, completedBy: Person, completedAt: DateTime) 
@@ -279,29 +352,36 @@ uncomplete(task: Task): returns (task: Task, lastCompletedBy: Person, lastComple
   then
     record the previous completedBy and completedAt
     clear completedBy and completedAt
-    if the previous assignee is no longer available for the task, clear assignee and source
+    a reopened weekly occurrence takes the same assignee and source as its other open occurrences
+    for standalone tasks, clear assignee and source if the previous assignee is no longer available
     returns task, lastCompletedBy, lastCompletedAt
 ```
 
 ## Queries
 ```queries
-_get(task: Task) : optional (group: Group, item: Item, category: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)
+_assignments(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, weekly: Flag, occurrences: Number, remaining: Number, mixed: Flag, assignee: Person, startsAt: DateTime, firstWindowEndsAt: DateTime, endsAt: DateTime, flexibleDays: Flag, timeZone: String)
+  Returns one row per visible standalone or weekly assignment with at least one occurrence in the requested window. Weekly rows summarize the whole series.
+
+_get(task: Task) : optional (group: Group, item: Item, category?: Category, weight: Number, deadline?: DateTime, interval?: Interval, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime, archived?: Flag, timeZone?: String, flexibleDays?: Flag)
   Returns task details if task exists, or no rows otherwise.
 
-_completionContext(task: Task) : optional (group: Group, item: Item, assignee?: Person, dueAt: DateTime, completion: CompletionState)
-  Returns the task group, item, optional assignee, due time, and completion state from one read, or no row for an unknown task. The due time is the deadline if present, otherwise the scheduled interval end.
+_completionContext(task: Task) : optional (group: Group, item: Item, assignee?: Person, dueAt: DateTime, completion: CompletionState, interval?: Interval, archived?: Flag)
+  Returns the task group, item, optional assignee, due time, completion state, interval, and archive status from one read, or no row for an unknown task. The due time is the deadline if present, otherwise the scheduled interval end.
 
 _status(task: Task, asOf: DateTime) : optional (status: Status)
   Returns the task status, or no row for an unknown task. The cutoff is the interval end when present, otherwise the deadline. Incomplete tasks are overdue only when asOf is after the cutoff. Completed tasks are late only when completed after the cutoff.
 
 _incomplete(task: Task) : optional (group: Group)
-  Returns the owning group for an incomplete task. Returns no row for missing or completed tasks.
+  Returns the owning group for an active, incomplete task. Returns no row for missing, completed, or archived tasks.
 
-_tasks(group: Group) : many (task: Task, item: Item, category: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)
+_activeTask(task: Task) : optional (group: Group)
+  Returns the household if the task is visible in the schedule.
+
+_tasks(group: Group) : many (task: Task, item: Item, category?: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)
   Returns all tasks belonging to a group, ordered by interval start when present, otherwise by deadline, with ties broken by task identity. Returns no rows when none match.
 
-_schedule(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, category: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)
-  Returns all tasks in group with their scheduled interval start or their deadline in [from, until), ordered as in _tasks. Returns no rows when none match.
+_schedule(group: Group, from: DateTime, until: DateTime) : many (task: Task, item: Item, category?: Category, weight: Number, deadline?: DateTime, start?: DateTime, end?: DateTime, assignee?: Person, source?: Source, completedBy?: Person, completedAt?: DateTime)
+  Returns all visible tasks in group with their scheduled interval start or their deadline in [from, until), or a flexible window overlapping that period, ordered as in _tasks. Returns no rows when none match.
 
 _pending(group: Group, asOf: DateTime) : many (task: Task, item: Item, assignee?: Person, interval?: Interval, deadline?: DateTime, status: Status)
   Returns all incomplete tasks with interval starts or deadlines after asOf, along with a PENDING or OVERDUE status by comparing the current time to the interval end when present, otherwise to the deadline. Orders rows as in _tasks and returns no rows when none match.
@@ -318,8 +398,11 @@ _completedInInterval(group: Group, from: DateTime, until: DateTime) : many (task
 _availability(group: Group, person: Person) : many (availability: Availability, interval: Interval)
   Returns the person's availabilities, ordered by earliest start then availability identity. Returns no rows when none match.
 
+_weeklyAvailability(group: Group, person: Person) : one (days: WeekAvailability)
+  Returns this person's recurring weekday availability, or null when no weekly pattern is saved.
+
 _hasAvailability(group: Group) : one (available: Flag)
-  Returns whether any availability remains in the group, or false if the group has none.
+  Returns whether any weekly day is eligible or any unsuperseded legacy availability remains in the group, or false if the group has none.
 
 _workload(group: Group, person: Person) : one (workload: Number)
   Returns the calculated total assigned workload of a person in the group, or zero when no tasks are assigned.

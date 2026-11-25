@@ -3,7 +3,7 @@
 import { computed, onMounted, ref } from "vue";
 import SwapPair from "../components/SwapPair.vue";
 import { formatDate } from "../display.ts";
-import { cancelSwap, getPeople, getSwaps, respondToSwap } from "../residentApi.ts";
+import { cancelSwap, getPeople, getSwaps, respondToSwap } from "../swapPreview.ts";
 import type { Person, SwapOverview, SwapRequest } from "../types.ts";
 
 const swaps = ref<SwapOverview | null>(null);

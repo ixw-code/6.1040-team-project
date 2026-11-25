@@ -2,7 +2,8 @@
 // After the camera: Retake or Submit.
 import { onBeforeUnmount, ref, watch } from "vue";
 import { useNav } from "../nav.ts";
-import { submitPhoto } from "../residentApi.ts";
+import { useResidentApi } from "../residentApi.ts";
+const { submitPhoto } = useResidentApi();
 
 const props = defineProps<{ taskId: string; file: File }>();
 const nav = useNav();
@@ -31,8 +32,8 @@ async function submit() {
   try {
     await submitPhoto(props.taskId, file.value);
     nav.back(); // Task detail reloads and shows Submitted.
-  } catch {
-    error.value = "Couldn't submit. Try again.";
+  } catch (e) {
+    error.value = (e as Error).message;
   } finally {
     busy.value = false;
   }
@@ -46,7 +47,7 @@ async function submit() {
       <button type="button" class="rs-pill rs-pill--submit rs-heading" :disabled="busy" @click="submit">
         {{ busy ? "Submitting…" : "Submit" }}
       </button>
-      <input ref="camera" type="file" accept="image/*" capture="environment" hidden @change="retake" />
+      <input ref="camera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden @change="retake" />
     </header>
     <img :src="url" alt="The photo you just took" class="photo" />
     <p v-if="error" role="alert" class="rs-hand error">{{ error }}</p>

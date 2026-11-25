@@ -55,6 +55,18 @@ export type ShiftHappensWire = {
     };
     error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "TASK_INTERVAL_INVALID" };
   };
+  "/assignments/availability/edit": {
+    input: {
+      "adding": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["editAvailability"]>[0], ["adding"]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["editAvailability"]>[0], ["group"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "windows": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["availabilityWindows"]["fn"]>[0], ["windows"]>>;
+    };
+    output: {
+      "freed": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["editAvailability"]>>, ["freed"]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "TASK_INTERVAL_INVALID" };
+  };
   "/assignments/availability/remove": {
     input: {
       "availability": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_availability"]>>>, ["availability"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["removeAvailability"]>[0], ["availability"]>]>>;
@@ -67,6 +79,60 @@ export type ShiftHappensWire = {
     };
     error: { error: AppWideError | "ACCESS_DENIED" | "AVAILABILITY_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
   };
+  "/assignments/availability/weekly": {
+    input: {
+      "household": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_weeklyAvailability"]>[0], ["group"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>]>>;
+      "person": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "days": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_weeklyAvailability"]>>>, ["days"]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
+  "/assignments/availability/weekly/set": {
+    input: {
+      "days": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["setWeeklyAvailability"]>[0], ["days"]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["setWeeklyAvailability"]>[0], ["group"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "timeZone": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["setWeeklyAvailability"]>[0], ["timeZone"]>>;
+    };
+    output: {
+      "freed": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["setWeeklyAvailability"]>>, ["freed"]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "WEEKLY_AVAILABILITY_INVALID" };
+  };
+  "/assignments/list": {
+    input: {
+      "from": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentDate"]["fn"]>[0], ["value"]>>;
+      "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "until": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentDate"]["fn"]>[0], ["value"]>>;
+    };
+    output: {
+      "assignments": ({
+        "assignee": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["assignee"]>>;
+        "chore": {
+          "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["description"]>> | null;
+          "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["name"]>> | null;
+          "references": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["references"]>> | null;
+          "requirements": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["requirements"]>> | null;
+        };
+        "endsAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["endsAt"]>>;
+        "firstWindowEndsAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["firstWindowEndsAt"]>>;
+        "flexibleDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["flexibleDays"]>>;
+        "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["item"]>>;
+        "mixed": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["mixed"]>>;
+        "occurrences": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["occurrences"]>>;
+        "remaining": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["remaining"]>>;
+        "startsAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["startsAt"]>>;
+        "task": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["task"]>>;
+        "timeZone": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["timeZone"]>>;
+        "weekly": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["weekly"]>>;
+      })[];
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "SCHEDULE_WINDOW_INVALID" };
+  };
   "/assignments/mine": {
     input: {
       "from": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentDate"]["fn"]>[0], ["value"]>>;
@@ -78,7 +144,7 @@ export type ShiftHappensWire = {
     output: {
       "tasks": ({
         "assignee": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["assignee"]>> | null;
-        "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>>;
+        "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>>, ["category"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>]>> | null;
         "categoryName": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>> | null;
         "chore": {
           "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["description"]>> | null;
@@ -89,6 +155,7 @@ export type ShiftHappensWire = {
         "completedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedAt"]>> | null;
         "completedBy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedBy"]>> | null;
         "deadline": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["deadline"]>> | null;
+        "flexibleDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["flexibleDays"]>> | null;
         "interval": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["interval"]>> | null;
         "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["item"]>>;
         "source": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["source"]>> | null;
@@ -115,6 +182,7 @@ export type ShiftHappensWire = {
           "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_preferences"]>>>, ["category"]>>;
           "preferenceLevel": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_preferences"]>>>, ["preferenceLevel"]>>;
         }[];
+        "weeklyAvailability": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_weeklyAvailability"]>>>, ["days"]>>;
         "workload": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_workload"]>>>, ["workload"]>>;
       }[];
     };
@@ -153,7 +221,7 @@ export type ShiftHappensWire = {
     output: {
       "tasks": ({
         "assignee": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["assignee"]>> | null;
-        "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>>;
+        "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>>, ["category"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>]>> | null;
         "categoryName": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>> | null;
         "chore": {
           "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["description"]>> | null;
@@ -164,6 +232,7 @@ export type ShiftHappensWire = {
         "completedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedAt"]>> | null;
         "completedBy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedBy"]>> | null;
         "deadline": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["deadline"]>> | null;
+        "flexibleDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["flexibleDays"]>> | null;
         "interval": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["interval"]>> | null;
         "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["item"]>>;
         "source": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["source"]>> | null;
@@ -185,6 +254,37 @@ export type ShiftHappensWire = {
     };
     error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "PERSON_NOT_AVAILABLE" | "SCHEDULE_ENTRIES_INVALID" | "TASK_INTERVAL_INVALID" | "TASK_NOT_FOUND" | "TASK_STATUS_CONFLICT" };
   };
+  "/assignments/task": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>>>, ["group"]>]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "task": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>>;
+    };
+    output: {
+      "task": {
+        "assignee": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["assignee"]>> | null;
+        "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>>, ["category"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>]>> | null;
+        "categoryName": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>> | null;
+        "chore": {
+          "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["description"]>> | null;
+          "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["name"]>> | null;
+          "references": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["references"]>> | null;
+          "requirements": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["requirements"]>> | null;
+        };
+        "completedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedAt"]>> | null;
+        "completedBy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedBy"]>> | null;
+        "deadline": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["deadline"]>> | null;
+        "flexibleDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["flexibleDays"]>> | null;
+        "interval": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["interval"]>> | null;
+        "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["item"]>>;
+        "source": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["source"]>> | null;
+        "status": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_status"]>>>, ["status"]>>;
+        "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_status"]>[0], ["task"]>]>>;
+        "weight": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["weight"]>>;
+      };
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+  };
   "/assignments/tasks/create": {
     input: {
       "chore": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["add"]>[0], ["item"]>>;
@@ -198,24 +298,51 @@ export type ShiftHappensWire = {
     };
     error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "TASK_INTERVAL_INVALID" | "TASK_WEIGHT_INVALID" };
   };
+  "/assignments/tasks/create-batch": {
+    input: {
+      "batchId": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["batchId"]>>;
+      "chore": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["item"]>>;
+      "flexibleDays"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["flexibleDays"]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["group"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>]>>;
+      "repeatWeekly"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["repeatWeekly"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "timeZone"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["timeZone"]>>;
+      "windows": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["availabilityWindows"]["fn"]>[0], ["windows"]>>;
+    };
+    output: {
+      "tasks": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>>, ["tasks"]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "TASK_INTERVAL_INVALID" | "TASK_WEIGHT_INVALID" };
+  };
   "/assignments/tasks/deadline": {
     input: {
       "deadline"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentDate"]["fn"]>[0], ["value"]>>;
       "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>[0], ["task"]>]>>;
+      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>]>>;
     };
     output: {
       "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>>, ["task"]>]>>;
     };
     error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "TASK_INTERVAL_INVALID" | "TASK_NOT_FOUND" | "TASK_STATUS_CONFLICT" };
   };
+  "/assignments/tasks/delete": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["archiveAssignment"]>[0], ["group"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "task": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["archiveAssignment"]>[0], ["task"]>>;
+    };
+    output: {
+      "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["archiveAssignment"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["archiveAssignment"]>>, ["task"]>]>>;
+    };
+    error: { error: AppWideError | "ACCESS_DENIED" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "TASK_NOT_FOUND" };
+  };
   "/assignments/tasks/interval": {
     input: {
       "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
       "interval"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentInterval"]["fn"]>[0], ["value"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>[0], ["task"]>]>>;
+      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>]>>;
     };
     output: {
       "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>>, ["task"]>]>>;
@@ -226,7 +353,7 @@ export type ShiftHappensWire = {
     input: {
       "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>[0], ["task"]>]>>;
+      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>]>>;
     };
     output: {
       "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>>, ["task"]>]>>;
@@ -259,14 +386,14 @@ export type ShiftHappensWire = {
   };
   "/completion/submit": {
     input: {
-      "photo": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["photo"]>>;
+      "photo": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["photo"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["_ownedUpload"]>[0], ["photo"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "task": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["subject"]>>;
+      "task": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["subject"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_completionContext"]>[0], ["task"]>]>]>>;
     };
     output: {
       "submission": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>>, ["submission"]>>;
     };
-    error: { error: AppWideError | "ALREADY_APPROVED" | "ALREADY_PENDING" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" };
+    error: { error: AppWideError | "ALREADY_APPROVED" | "ALREADY_PENDING" | "INVALID_INPUT" | "NOT_FOUND" | "NOT_SIGNED_IN" | "SUBMISSION_CLOSED" | "SUBMISSION_NOT_OPEN" };
   };
   "/households/categories": {
     input: {
@@ -540,6 +667,17 @@ export type ShiftHappensWireHttp = {
     };
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
+  "/assignments/availability/edit": {
+    input: {
+      "adding": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["editAvailability"]>[0], ["adding"]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["editAvailability"]>[0], ["group"]>]>>;
+      "windows": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["availabilityWindows"]["fn"]>[0], ["windows"]>>;
+    };
+    output: {
+      "freed": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["editAvailability"]>>, ["freed"]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
   "/assignments/availability/remove": {
     input: {
       "availability": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_availability"]>>>, ["availability"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["removeAvailability"]>[0], ["availability"]>]>>;
@@ -548,6 +686,57 @@ export type ShiftHappensWireHttp = {
     };
     output: {
       "freed": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["removeAvailability"]>>, ["freed"]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/assignments/availability/weekly": {
+    input: {
+      "household": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_weeklyAvailability"]>[0], ["group"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>]>>;
+      "person": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>>>, ["person"]>>;
+    };
+    output: {
+      "days": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_weeklyAvailability"]>>>, ["days"]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/assignments/availability/weekly/set": {
+    input: {
+      "days": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["setWeeklyAvailability"]>[0], ["days"]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["setWeeklyAvailability"]>[0], ["group"]>]>>;
+      "timeZone": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["setWeeklyAvailability"]>[0], ["timeZone"]>>;
+    };
+    output: {
+      "freed": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["setWeeklyAvailability"]>>, ["freed"]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/assignments/list": {
+    input: {
+      "from": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentDate"]["fn"]>[0], ["value"]>>;
+      "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
+      "until": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentDate"]["fn"]>[0], ["value"]>>;
+    };
+    output: {
+      "assignments": ({
+        "assignee": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["assignee"]>>;
+        "chore": {
+          "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["description"]>> | null;
+          "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["name"]>> | null;
+          "references": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["references"]>> | null;
+          "requirements": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["requirements"]>> | null;
+        };
+        "endsAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["endsAt"]>>;
+        "firstWindowEndsAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["firstWindowEndsAt"]>>;
+        "flexibleDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["flexibleDays"]>>;
+        "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["item"]>>;
+        "mixed": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["mixed"]>>;
+        "occurrences": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["occurrences"]>>;
+        "remaining": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["remaining"]>>;
+        "startsAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["startsAt"]>>;
+        "task": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["task"]>>;
+        "timeZone": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["timeZone"]>>;
+        "weekly": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_assignments"]>>>, ["weekly"]>>;
+      })[];
     };
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
@@ -561,7 +750,7 @@ export type ShiftHappensWireHttp = {
     output: {
       "tasks": ({
         "assignee": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["assignee"]>> | null;
-        "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>>;
+        "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>>, ["category"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>]>> | null;
         "categoryName": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>> | null;
         "chore": {
           "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["description"]>> | null;
@@ -572,6 +761,7 @@ export type ShiftHappensWireHttp = {
         "completedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedAt"]>> | null;
         "completedBy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedBy"]>> | null;
         "deadline": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["deadline"]>> | null;
+        "flexibleDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["flexibleDays"]>> | null;
         "interval": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["interval"]>> | null;
         "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["item"]>>;
         "source": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["source"]>> | null;
@@ -597,6 +787,7 @@ export type ShiftHappensWireHttp = {
           "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_preferences"]>>>, ["category"]>>;
           "preferenceLevel": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_preferences"]>>>, ["preferenceLevel"]>>;
         }[];
+        "weeklyAvailability": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_weeklyAvailability"]>>>, ["days"]>>;
         "workload": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_workload"]>>>, ["workload"]>>;
       }[];
     };
@@ -632,7 +823,7 @@ export type ShiftHappensWireHttp = {
     output: {
       "tasks": ({
         "assignee": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["assignee"]>> | null;
-        "category": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>>;
+        "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>>, ["category"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>]>> | null;
         "categoryName": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>> | null;
         "chore": {
           "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["description"]>> | null;
@@ -643,6 +834,7 @@ export type ShiftHappensWireHttp = {
         "completedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedAt"]>> | null;
         "completedBy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedBy"]>> | null;
         "deadline": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["deadline"]>> | null;
+        "flexibleDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["flexibleDays"]>> | null;
         "interval": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["interval"]>> | null;
         "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["item"]>>;
         "source": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["source"]>> | null;
@@ -663,6 +855,36 @@ export type ShiftHappensWireHttp = {
     };
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
+  "/assignments/task": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_residents"]>[0], ["household"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>>>, ["group"]>]>]>>;
+      "task": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>>;
+    };
+    output: {
+      "task": {
+        "assignee": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["assignee"]>> | null;
+        "category": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>[0], ["category"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["assignmentCategory"]["fn"]>>, ["category"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["category"]>]>> | null;
+        "categoryName": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_categories"]>>>, ["name"]>> | null;
+        "chore": {
+          "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["description"]>> | null;
+          "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["name"]>> | null;
+          "references": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["references"]>> | null;
+          "requirements": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ChoreCataloguing"]["_get"]>>>, ["requirements"]>> | null;
+        };
+        "completedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedAt"]>> | null;
+        "completedBy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["completedBy"]>> | null;
+        "deadline": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["deadline"]>> | null;
+        "flexibleDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["flexibleDays"]>> | null;
+        "interval": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["interval"]>> | null;
+        "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["item"]>>;
+        "source": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["source"]>> | null;
+        "status": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_status"]>>>, ["status"]>>;
+        "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_status"]>[0], ["task"]>]>>;
+        "weight": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>>>, ["weight"]>>;
+      };
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
   "/assignments/tasks/create": {
     input: {
       "chore": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["add"]>[0], ["item"]>>;
@@ -675,22 +897,47 @@ export type ShiftHappensWireHttp = {
     };
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
+  "/assignments/tasks/create-batch": {
+    input: {
+      "batchId": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["batchId"]>>;
+      "chore": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["item"]>>;
+      "flexibleDays"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["flexibleDays"]>>;
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["group"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>]>>;
+      "repeatWeekly"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["repeatWeekly"]>>;
+      "timeZone"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>[0], ["timeZone"]>>;
+      "windows": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["availabilityWindows"]["fn"]>[0], ["windows"]>>;
+    };
+    output: {
+      "tasks": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["addBatch"]>>, ["tasks"]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
   "/assignments/tasks/deadline": {
     input: {
       "deadline"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentDate"]["fn"]>[0], ["value"]>>;
       "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
-      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>[0], ["task"]>]>>;
+      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>]>>;
     };
     output: {
       "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateDeadline"]>>, ["task"]>]>>;
     };
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
+  "/assignments/tasks/delete": {
+    input: {
+      "household": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["archiveAssignment"]>[0], ["group"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>]>>;
+      "task": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["archiveAssignment"]>[0], ["task"]>>;
+    };
+    output: {
+      "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["archiveAssignment"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["archiveAssignment"]>>, ["task"]>]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
   "/assignments/tasks/interval": {
     input: {
       "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
       "interval"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["assignmentInterval"]["fn"]>[0], ["value"]>>;
-      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>[0], ["task"]>]>>;
+      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>]>>;
     };
     output: {
       "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["updateInterval"]>>, ["task"]>]>>;
@@ -700,7 +947,7 @@ export type ShiftHappensWireHttp = {
   "/assignments/tasks/remove": {
     input: {
       "household": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["HouseholdManaging"]["_household"]>[0], ["household"]>>;
-      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_get"]>[0], ["task"]>]>>;
+      "task": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_incomplete"]>[0], ["task"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>>, ["task"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>]>>;
     };
     output: {
       "task": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>[0], ["task"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["remove"]>>, ["task"]>]>>;
@@ -731,8 +978,8 @@ export type ShiftHappensWireHttp = {
   };
   "/completion/submit": {
     input: {
-      "photo": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["photo"]>>;
-      "task": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["subject"]>>;
+      "photo": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["photo"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["_ownedUpload"]>[0], ["photo"]>]>>;
+      "task": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>[0], ["subject"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_activeTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TaskScheduling"]["_completionContext"]>[0], ["task"]>]>]>>;
     };
     output: {
       "submission": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["PhotoChecking"]["submit"]>>, ["submission"]>>;

@@ -1,28 +1,44 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
-import { compute, no, view, where, whether } from "@mit-sdg/sync-engine/language";
+import { compute, no, now, view, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations } from "../concepts.ts";
 
 const { Sessioning, TaskScheduling, HouseholdManaging, ChoreCataloguing, PhotoChecking } = concepts;
 
-const CanSubmit = view("(person) can submit (photo) for (task)", ({ person, photo, task }, { group, item }) =>
-  where(
-    TaskScheduling._completionContext({ task }).is({ group, item, assignee: person, completion: "INCOMPLETE" }),
+const CanSubmit = view("(person) can submit (photo) for (task)", (
+  { person, photo, task }, { interval, requirements, references }, { group, item },
+) => where(
+    TaskScheduling._completionContext({ task }).is({ group, item, assignee: person, completion: "INCOMPLETE", interval }),
+    TaskScheduling._activeTask({ task }).is({ group }),
     HouseholdManaging._residents({ household: group }).is({ person }),
     PhotoChecking._ownedUpload({ photo, person }).is({}),
+    ChoreCataloguing._get({ chore: item }).is({ group, requirements, references }),
   ),
 ).optional();
 
 const Submit = endpoint("/completion/submit", ({
-  session, task, photo, person, group, item, requirements, references, criteria, baseline, submission,
+  session, task, photo, person, interval, requirements, references, criteria, baseline, submission, submittedAt,
 }) => {
   const permitted = CanSubmit({ person, photo, task });
   return receive({ session, task, photo }).then(Sessioning.use({ session }).responds({ subject: person })).then(
     where(no(permitted.is({}))).then(respond({ error: "NOT_FOUND" })).named("missing"),
     where(
-      permitted.is({ group, item }),
-      whether(ChoreCataloguing._get({ chore: item }).is({ group, requirements, references })),
+      permitted.is({ interval }),
+      now(submittedAt),
+      compute(computations.evidenceWindow, { interval, submittedAt }, { state: "upcoming" }),
+    ).then(respond({ error: "SUBMISSION_NOT_OPEN" })).named("tooEarly"),
+    where(
+      permitted.is({ interval }),
+      now(submittedAt),
+      compute(computations.evidenceWindow, { interval, submittedAt }, { state: "closed" }),
+    ).then(respond({ error: "SUBMISSION_CLOSED" })).named("tooLate"),
+    where(
+      permitted.is({ interval, requirements, references }),
+      now(submittedAt),
+      compute(computations.evidenceWindow, { interval, submittedAt }, { state: "open" }),
       compute(computations.evidenceInstructions, { requirements, references }, { criteria, baseline }),
-    ).then(PhotoChecking.submit({ subject: task, person, photo, criteria, baseline, method: "MANUAL" }).responds({ submission }))
+    ).then(PhotoChecking.submit({
+      subject: task, person, photo, criteria, baseline, method: "MANUAL", submittedAt,
+    }).responds({ submission }))
       .then(respond({ submission })).named("submitted"),
   );
 }, {

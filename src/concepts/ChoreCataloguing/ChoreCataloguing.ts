@@ -9,13 +9,13 @@ type ChoreRef = { chore: string };
 type ChoreKey = ChoreRef & { group: string };
 type ChoreDetails = {
   name: string;
-  category: string;
+  category?: string;
   difficulty: number;
   description: string;
   requirements: string[];
   references: string[];
 };
-type ChoreDocument = ChoreDetails & { _id: string; group: string };
+type ChoreDocument = ChoreDetails & { _id: string; group: string; archived?: boolean };
 
 function validDifficulty(difficulty: number): boolean {
   return Number.isFinite(difficulty) && difficulty >= 1 && difficulty <= 10;
@@ -38,22 +38,35 @@ export class ChoreCataloguingConcept {
   }
 
   #ensureNameIndex() {
-    this.nameIndex ??= this.#chores()
-      .createIndex({ group: 1, name: 1 }, { unique: true, collation: { locale: "simple" } })
-      .catch((error: unknown) => {
-        this.nameIndex = undefined;
-        throw error;
-      });
+    this.nameIndex ??= this.#prepareNameIndex().catch((error: unknown) => {
+      this.nameIndex = undefined;
+      throw error;
+    });
     return this.nameIndex;
   }
 
+  async #prepareNameIndex(): Promise<string> {
+    const chores = this.#chores();
+    await chores.updateMany({ archived: { $exists: false } }, { $set: { archived: false } });
+    const index = await chores.createIndex({ group: 1, name: 1 }, {
+      name: "active_chore_name", unique: true, partialFilterExpression: { archived: false }, collation: { locale: "simple" },
+    });
+    // Replace the original unique index only after its replacement is enforcing active names.
+    try {
+      await chores.dropIndex("group_1_name_1");
+    } catch (error) {
+      if (!(error instanceof MongoServerError && error.code === 27)) throw error;
+    }
+    return index;
+  }
+
   async #requireChore({ chore, group }: ChoreKey): Promise<void> {
-    const found = await this.#chores().findOne({ _id: chore, group }, { projection: { _id: 1 } });
+    const found = await this.#chores().findOne({ _id: chore, group, archived: { $ne: true } }, { projection: { _id: 1 } });
     if (!found) throw new ChoreDoesntExist("This chore doesn't exist in the catalog.");
   }
 
   async #update({ chore, group }: ChoreKey, fields: Partial<ChoreDetails>): Promise<ChoreRef> {
-    const result = await this.#chores().updateOne({ _id: chore, group }, { $set: fields });
+    const result = await this.#chores().updateOne({ _id: chore, group, archived: { $ne: true } }, { $set: fields });
     if (result.matchedCount === 0) throw new ChoreDoesntExist("This chore doesn't exist in the catalog.");
     return { chore };
   }
@@ -68,7 +81,8 @@ export class ChoreCataloguingConcept {
     await this.#ensureNameIndex();
     try {
       await this.#chores().insertOne({
-        _id: chore, group, name, category, difficulty, description,
+        _id: chore, group, name, difficulty, description, archived: false,
+        ...(category !== undefined && { category }),
         requirements: [...new Set(requirements)], references: [...new Set(references)],
       });
     } catch (error) {
@@ -118,15 +132,34 @@ export class ChoreCataloguingConcept {
     return { chore, group };
   }
 
+  async archive({ chore, group }: ChoreKey): Promise<ChoreKey> {
+    const result = await this.#chores().updateOne({ _id: chore, group }, { $set: { archived: true } });
+    if (result.matchedCount === 0) throw new ChoreDoesntExist("This chore doesn't exist in the catalog.");
+    return { chore, group };
+  }
+
   async _get({ chore }: ChoreRef): Promise<(ChoreDetails & { group: string })[]> {
-    const found = await this.#chores().findOne({ _id: chore });
+    return this.#readChore(chore, true);
+  }
+
+  async _active({ chore }: ChoreRef): Promise<(ChoreDetails & { group: string })[]> {
+    return this.#readChore(chore, false);
+  }
+
+  async #readChore(chore: string, includeArchived: boolean): Promise<(ChoreDetails & { group: string })[]> {
+    const found = await this.#chores().findOne({ _id: chore, ...(!includeArchived && { archived: { $ne: true } }) });
     if (!found) return [];
-    const { _id, ...details } = found;
+    const { _id, archived: _archived, ...details } = found;
     return [details];
   }
 
+  async _catalogItems({ group }: { group: string }): Promise<{ items: string[] }> {
+    const items = await this.#chores().distinct("_id", { group, archived: { $ne: true } });
+    return { items };
+  }
+
   async #list(filter: { group: string; category?: string }, sortByDifficulty: boolean): Promise<ChoreDocument[]> {
-    const rows = await this.#chores().find(filter).toArray();
+    const rows = await this.#chores().find({ ...filter, archived: { $ne: true } }).toArray();
     return rows.sort((first, second) =>
       (sortByDifficulty ? first.difficulty - second.difficulty : 0)
       || first.name.localeCompare(second.name, "en")
@@ -138,13 +171,13 @@ export class ChoreCataloguingConcept {
     (ChoreRef & ChoreDetails)[]
   > {
     const rows = await this.#list({ group }, sortByDifficulty);
-    return rows.map(({ _id, group: _group, ...details }) => ({ chore: _id, ...details }));
+    return rows.map(({ _id, group: _group, archived: _archived, ...details }) => ({ chore: _id, ...details }));
   }
 
   async _choresByCategory({ group, category, sortByDifficulty }: {
     group: string; category: string; sortByDifficulty: boolean;
   }): Promise<(ChoreRef & Omit<ChoreDetails, "category">)[]> {
     const rows = await this.#list({ group, category }, sortByDifficulty);
-    return rows.map(({ _id, group: _group, category: _category, ...details }) => ({ chore: _id, ...details }));
+    return rows.map(({ _id, group: _group, category: _category, archived: _archived, ...details }) => ({ chore: _id, ...details }));
   }
 }

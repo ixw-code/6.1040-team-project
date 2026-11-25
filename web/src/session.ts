@@ -9,7 +9,6 @@ interface Me {
 const me = ref<Me | null>(null);
 const checked = ref(false);
 const error = ref<string | null>(null);
-const household = ref("");
 
 async function load() {
   const result = await api.user.me();
@@ -34,7 +33,8 @@ async function enter(answer: Promise<object>, messages: Record<string, string>):
 
 /** Signs out, then reloads the page so that the tab's uploads, polling, and requests stop. */
 async function signOut() {
-  await api.user.logout();
+  const result = await api.user.logout();
+  if ("error" in result && result.error !== "UNAUTHORIZED") throw new Error("Sign out failed. Try again.");
   window.location.assign("/");
 }
 
@@ -44,8 +44,7 @@ function sessionEnded() {
   me.value = null;
 }
 
-
 /** The signed-in person, and the functions that call `/auth/me` and `/auth/logout`, shared by every component and every way of signing in. */
 export function useSession() {
-  return { me, checked, error, household, load, enter, signOut, sessionEnded };
+  return { me, checked, error, load, enter, signOut, sessionEnded };
 }

@@ -3,6 +3,7 @@ import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { assembleApplication } from "./assembly.ts";
 import { createCompletionHandler, createCompletionHooks } from "./adapters/completionHttp.ts";
 import { createPhotoHandler, createPhotoStore } from "./adapters/photos.ts";
+import { createCatalogHandler } from "./compositions/Catalog.ts";
 import { maxRequestBodyBytes, policy } from "./http.ts";
 import { getDb } from "./db.ts";
 
@@ -42,6 +43,7 @@ const server = Bun.serve({
     },
     "/api/photos": photos,
     "/api/photos/:photo": photos,
+    "/api/catalog/*": createCatalogHandler(application.concepts, photoStore),
     "/api/completion/submit": api,
     "/api/completion/*": createCompletionHandler(application.concepts, photoStore, createCompletionHooks(application.concepts)),
     "/api/*": api,

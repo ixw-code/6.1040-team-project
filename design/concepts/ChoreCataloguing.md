@@ -21,6 +21,9 @@ external Category
 external Photo
   A reference to a photo.
 
+opaque ChoreSet
+  A list of chore identities.
+
 opaque RequirementSet
   A set of requirement strings.
 
@@ -33,14 +36,15 @@ opaque PhotoSet
 a set of Chores with 
   a name String 
   a group Group
-  a category Category
+  an optional category Category
+  an optional archived Flag
   a difficulty Number 
   a description String
   a requirements set of String
   a references set of Photo
-  unique name and group
+  Rule: active chores have a unique name within their group
 
-Rule: the composition checks that a chore's category belongs to the same group as the chore
+Rule: when supplied, the composition checks that a chore's category belongs to the same group as the chore
 Rule: a chore's name contains at least one non-whitespace character
 Rule: chore names are compared exactly, including case and surrounding whitespace
 Rule: difficulty weights are finite numbers bounded in the range [1.0, 10.0]
@@ -48,8 +52,8 @@ Rule: difficulty weights are finite numbers bounded in the range [1.0, 10.0]
 
 ## Actions 
 ```actions
-create(group: Group, name: String, description: String, category: Category, difficulty: Number, requirements: RequirementSet, references: PhotoSet ): returns (chore: Chore)
-  where chore with name for group already exists 
+create(group: Group, name: String, description: String, category?: Category, difficulty: Number, requirements: RequirementSet, references: PhotoSet ): returns (chore: Chore)
+  where an active chore with the same name for the group already exists
   then 
     refuses CHORE_NAME_CONFLICT "Chore with the same name already exists."
   where chore name is invalid according to rules
@@ -116,14 +120,29 @@ remove(chore: Chore, group: Group): returns (chore: Chore, group: Group)
   then
     remove that chore
     returns chore, group
+archive(chore: Chore, group: Group): returns (chore: Chore, group: Group)
+  where the chore does not exist in the group
+  then
+    refuses CHORE_DOESNT_EXIST "This chore doesn't exist in the catalog."
+  where the chore exists in the group
+  then
+    mark the chore archived and keep its details for existing tasks
+    exclude the chore from the active catalog and free its name for use in the group
+    returns chore, group
 ```
 
 ## Queries 
 ```queries
-_get(chore: Chore) : optional (group: Group, name: String, category: Category, difficulty: Number, description: String, requirements: RequirementSet, references: PhotoSet)
+_get(chore: Chore) : optional (group: Group, name: String, category?: Category, difficulty: Number, description: String, requirements: RequirementSet, references: PhotoSet)
   Returns the details of the chore if it exists, or no rows if it does not.
 
-_chores(group: Group, sortByDifficulty: Flag) : many (chore: Chore, name: String, description: String, category: Category, difficulty: Number, requirements: RequirementSet, references: PhotoSet)
+_active(chore: Chore) : optional (group: Group, name: String, category?: Category, difficulty: Number, description: String, requirements: RequirementSet, references: PhotoSet)
+  Returns the chore only while it is in the active catalog.
+
+_catalogItems(group: Group) : one (items: ChoreSet)
+  Returns the IDs currently in the active catalog.
+
+_chores(group: Group, sortByDifficulty: Flag) : many (chore: Chore, name: String, description: String, category?: Category, difficulty: Number, requirements: RequirementSet, references: PhotoSet)
   Returns all the chores associated with a given group, in alphabetical order by name when sortByDifficulty is false, or by ascending difficulty then name when it is true. Breaks remaining ties by chore identity and returns no rows when none match.
 
 _choresByCategory(group: Group, category: Category, sortByDifficulty: Flag) : many (chore: Chore, name: String, description: String, difficulty: Number, requirements: RequirementSet, references: PhotoSet)

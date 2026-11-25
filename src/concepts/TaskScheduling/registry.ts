@@ -12,6 +12,7 @@ import {
   TaskSchedulingConcept,
   TaskStatusConflict,
   TaskWeightInvalid,
+  WeeklyAvailabilityInvalid,
 } from "./TaskScheduling.ts";
 
 export const taskScheduling = registerConcept({
@@ -28,5 +29,6 @@ export const taskScheduling = registerConcept({
     TASK_NOT_FOUND: TaskNotFound,
     TASK_STATUS_CONFLICT: TaskStatusConflict,
     TASK_WEIGHT_INVALID: TaskWeightInvalid,
+    WEEKLY_AVAILABILITY_INVALID: WeeklyAvailabilityInvalid,
   },
 });

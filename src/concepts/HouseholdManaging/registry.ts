@@ -4,6 +4,7 @@ import {
   CategoryNameConflict,
   CategoryNameInvalid,
   CategoryNotFound,
+  ChoreOrderInvalid,
   HouseholdManagingConcept,
   HouseholdNameInvalid,
   HouseholdNotFound,
@@ -25,6 +26,7 @@ export const householdManaging = registerConcept({
     CATEGORY_NAME_INVALID: CategoryNameInvalid,
     CATEGORY_NAME_CONFLICT: CategoryNameConflict,
     CATEGORY_NOT_FOUND: CategoryNotFound,
+    CHORE_ORDER_INVALID: ChoreOrderInvalid,
     PREFERENCE_LEVEL_INVALID: PreferenceLevelInvalid,
   },
 });

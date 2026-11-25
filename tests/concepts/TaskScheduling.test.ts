@@ -74,7 +74,7 @@ describe("TaskScheduling task lifecycle", () => {
       .toEqual({ task: late, completedBy: "alice", completedAt: at(4) });
     await concept.complete({ task: onTime, completedBy: "alice", completedAt: at(9) });
     expect(await concept._completionContext({ task: late })).toEqual([
-      { group, item: definition.item, dueAt: at(6), completion: "COMPLETED" },
+      { group, item: definition.item, dueAt: at(6), completion: "COMPLETED", interval: interval(2, 3) },
     ]);
     expect(await concept._completionContext({ task: overdue })).toEqual([
       { group, item: definition.item, dueAt: at(7), completion: "INCOMPLETE" },
@@ -108,6 +108,9 @@ describe("TaskScheduling task lifecycle", () => {
     expect(await concept.uncomplete({ task: late }))
       .toEqual({ task: late, lastCompletedBy: "alice", lastCompletedAt: at(4) });
     await expect(concept.uncomplete({ task: late })).rejects.toBeInstanceOf(TaskStatusConflict);
+    await concept.archiveAssignment({ group, task: overdue });
+    expect(await concept._incomplete({ task: overdue })).toEqual([]);
+    expect(await concept._completionContext({ task: overdue })).toMatchObject([{ archived: true }]);
   });
 });
 

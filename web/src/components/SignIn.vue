@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useSession } from "./session.ts";
+import { useSession } from "../session.ts";
 
 /** The app's logo icon and a line under the title. Put the ways of signing in the app offers inside, such as `CommonsButton` and `PasswordForm`. */
 defineProps<{ lead?: string }>();

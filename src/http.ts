@@ -4,21 +4,22 @@ import { accountsHttp, passwordsHttp } from "./compositions/Users.ts";
 import type { Session } from "./concepts/Sessioning/Sessioning.ts";
 
 export const sessionCookieName = "__Host-session";
-export const maxRequestBodyBytes = 1_048_576;
+export const maxRequestBodyBytes = 10 * 1024 * 1024;
 
 type Sessioning = ReturnType<typeof assembleApplication>["concepts"]["Sessioning"];
 
 import { assignmentHttpErrors } from "./compositions/ChoreAssignments.ts";
 import { householdHttpErrors } from "./compositions/HouseholdManagement.ts";
 
-const defaultPublicOrigin = process.env.NODE_ENV === "development"
-  ? "http://localhost:5173"
-  : "https://shift-happens.mit-sdg.dev/";
-
 export const policy = httpPolicy({
-  publicOrigin: process.env.PUBLIC_ORIGIN ?? defaultPublicOrigin,
+  publicOrigin: process.env.PUBLIC_ORIGIN ?? (process.env.NODE_ENV === "production"
+    ? "https://shift-happens.mit-sdg.dev" : "http://localhost:5173"),
   basePath: "/api",
-  publicErrors: { ...accountsHttp.publicErrors, ...passwordsHttp.publicErrors, ...householdHttpErrors, ...assignmentHttpErrors, ALREADY_PENDING: "CONFLICT", ALREADY_APPROVED: "CONFLICT" },
+  publicErrors: {
+    ...accountsHttp.publicErrors, ...passwordsHttp.publicErrors, ...householdHttpErrors, ...assignmentHttpErrors,
+    ALREADY_PENDING: "CONFLICT", ALREADY_APPROVED: "CONFLICT",
+    SUBMISSION_NOT_OPEN: "CONFLICT", SUBMISSION_CLOSED: "CONFLICT",
+  },
   cookies: {
     session: accountsHttp.sessionCookie(sessionCookieName, passwordsHttp.startingSessions),
   },

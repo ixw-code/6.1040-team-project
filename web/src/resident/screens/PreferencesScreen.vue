@@ -1,59 +1,72 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { getPreferences, setPreference } from "../residentApi.ts";
-import type { Preference } from "../types.ts";
+import { computed, ref } from "vue";
+import { post, useHousehold } from "../../household.ts";
 
-const prefs = ref<Preference[] | null>(null);
-const saved = ref("");
-const failed = ref(false);
+const { home, catalog } = useHousehold();
+const saved = computed(() => catalog.value.choreOrder);
+const choresById = computed(() => new Map(catalog.value.chores.map(chore => [chore.chore, chore])));
+const alreadyRanked = new Set(saved.value);
+const order = ref([
+  ...saved.value,
+  ...catalog.value.chores.filter(({ chore }) => !alreadyRanked.has(chore)).map(({ chore }) => chore),
+]);
+const changed = computed(() => order.value.length !== saved.value.length
+  || order.value.some((chore, index) => chore !== saved.value[index]));
+const message = ref("");
+const error = ref("");
+const busy = ref(false);
 
-onMounted(async () => {
+function move(index: number, direction: number) {
+  const next = index + direction;
+  if (next < 0 || next >= order.value.length) return;
+  const revised = [...order.value];
+  [revised[index], revised[next]] = [revised[next], revised[index]];
+  order.value = revised;
+  message.value = "";
+  error.value = "";
+}
+
+async function save() {
+  busy.value = true;
+  message.value = "";
+  error.value = "";
   try {
-    prefs.value = await getPreferences();
-  } catch {
-    failed.value = true;
+    const result = await post<{ order: string[] }>("catalog/preferences", { household: home.household, order: order.value });
+    catalog.value.choreOrder = result.order;
+    message.value = "Chore preferences saved.";
+  } catch (e) {
+    error.value = (e as Error).message;
+  } finally {
+    busy.value = false;
   }
-});
-
-async function change(pref: Preference, value: string) {
-  pref.rating = value === "" ? null : Number(value);
-  await setPreference(pref.choreId, pref.rating);
-  saved.value = `Saved ${pref.chore}`;
 }
 </script>
 
 <template>
   <section class="rs-screen">
-    <header>
-      <h1 class="rs-title rs-heading">Preferences</h1>
-      <p class="rs-body-text">Rate: 1 = least, 10 = most</p>
-    </header>
-
-    <p v-if="failed" class="rs-status-line rs-hand rs-error">Couldn't load preferences. Try again.</p>
-    <p v-else-if="!prefs" class="rs-status-line rs-hand">Loading…</p>
-    <ul v-else class="rs-paper list">
-      <li v-for="pref in prefs" :key="pref.choreId" class="row">
-        <label :for="`pref-${pref.choreId}`" class="rs-hand chore">{{ pref.chore }}</label>
-        <select
-          :id="`pref-${pref.choreId}`"
-          class="rs-select rs-serif"
-          :value="pref.rating ?? ''"
-          @change="change(pref, ($event.target as HTMLSelectElement).value)"
-        >
-          <!-- Unrated shows the house average. -->
-          <option value="">Avg {{ pref.average.toFixed(1) }}</option>
-          <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
-        </select>
-      </li>
-    </ul>
-    <p class="rs-visually-hidden" role="status">{{ saved }}</p>
+    <h1 class="rs-title rs-heading">Chore preferences</h1>
+    <p v-if="!order.length">Your overseer can add chores to the catalog.</p>
+    <form v-else class="ranking-form" @submit.prevent="save">
+      <p>Put the chores you most want to do at the top, then save. This order is used when the overseer assigns tasks automatically.</p>
+      <ol class="rs-paper" aria-label="Chore preference order">
+        <li v-for="(id, index) in order" :key="id" class="schedule-row">
+          <span>{{ index + 1 }}. {{ choresById.get(id)?.name }}</span>
+          <div class="actions-inline">
+            <button type="button" class="button button-secondary" :disabled="busy || index === 0"
+              :aria-label="`Move ${choresById.get(id)?.name} up`" @click="move(index, -1)">Move up</button>
+            <button type="button" class="button button-secondary" :disabled="busy || index === order.length - 1"
+              :aria-label="`Move ${choresById.get(id)?.name} down`" @click="move(index, 1)">Move down</button>
+          </div>
+        </li>
+      </ol>
+      <button class="rs-pill rs-heading" :disabled="busy || !changed">Save preferences</button>
+    </form>
+    <p v-if="message" role="status">{{ message }}</p>
+    <p v-if="error" class="rs-error" role="alert">{{ error }}</p>
   </section>
 </template>
 
 <style scoped>
-.list { max-width: 560px; margin: 0; padding: 6px 16px; list-style: none; }
-.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; border-bottom: 1px solid #c9d8ec; }
-.row:last-child { border-bottom: 0; }
-.chore { font-size: 21px; }
-.rs-select { min-width: 96px; font-size: 17px; }
+.ranking-form { display: grid; gap: 1rem; }
+.ranking-form > button { justify-self: start; }
 </style>

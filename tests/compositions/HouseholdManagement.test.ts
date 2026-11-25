@@ -93,7 +93,11 @@ describe("HouseholdManagement HTTP", () => {
       { person: alice.person }, { person: bob.person },
     ], categories: [{ category, name: "Cook" }] };
     expect(await post("/households/get", { household }, bob.cookie)).toMatchObject({ status: 200, body: { household: details } });
-    expect(await post("/households/residents", { household }, bob.cookie)).toMatchObject({ status: 200, body: { residents: details.residents } });
+    expect(await post("/households/residents", { household }, bob.cookie)).toMatchObject({
+      status: 200, body: { residents: [
+        { person: alice.person, username: alice.username }, { person: bob.person, username: bob.username },
+      ] },
+    });
     expect(await post("/households/categories", { household }, bob.cookie)).toMatchObject({ status: 200, body: { categories: details.categories } });
     expect(await post("/households/mine", {}, bob.cookie)).toMatchObject({ status: 200, body: { households: [{ household }] } });
 

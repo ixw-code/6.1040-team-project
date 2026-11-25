@@ -17,8 +17,9 @@ import { ChoreCataloguingConcept } from "./concepts/ChoreCataloguing/ChoreCatalo
 import { TaskSchedulingConcept } from "./concepts/TaskScheduling/TaskScheduling.ts";
 
 // Use the app database by default and let tests supply an isolated database.
-export function assembleApplication(database = getDb) {
+export function assembleApplication(database = getDb, clock?: () => Date) {
   return assemble({
+    clock,
     conceptSet: applicationConceptSet,
     composition: {
       Users,

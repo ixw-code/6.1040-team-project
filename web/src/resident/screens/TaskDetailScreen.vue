@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // Opened from My Tasks (your task) or Calendar (anyone's task, shown for transparency).
-// Your open task → Take Photo. Someone else's open task → Swap Task.
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { submissionWindowState } from "../../../../src/shared/assignmentDates.ts";
 import BackLink from "../components/BackLink.vue";
 import PhotoBox from "../components/PhotoBox.vue";
 import { ATTEMPT_BORDER, ATTEMPT_LABEL, formatDate, formatDateTime, isOpen, noteColor, statusText } from "../display.ts";
 import { useNav } from "../nav.ts";
-import { getPeople, getTask } from "../residentApi.ts";
+import { useResidentApi } from "../residentApi.ts";
+const { getPeople, getTask } = useResidentApi();
 import type { Person, Task } from "../types.ts";
 
 const props = defineProps<{ taskId: string }>();
@@ -15,22 +16,31 @@ const task = ref<Task | null>(null);
 const people = ref<Person[]>([]);
 const loaded = ref(false);
 const camera = ref<HTMLInputElement>();
+const now = ref(Date.now());
+let clock: ReturnType<typeof setInterval> | undefined;
 
 onMounted(async () => {
+  clock = setInterval(() => { now.value = Date.now(); }, 1000);
   [task.value, people.value] = await Promise.all([getTask(props.taskId), getPeople()]);
   loaded.value = true;
 });
+onUnmounted(() => clearInterval(clock));
 
 const owner = computed(() => people.value.find((p) => p.id === task.value?.ownerId));
 const mine = computed(() => owner.value?.isMe ?? false);
 const open = computed(() => (task.value ? isOpen(task.value.status) : false));
+const submissionState = computed(() => {
+  const entry = task.value;
+  return entry?.end ? submissionWindowState({ start: entry.start, end: entry.end }, now.value) : "closed";
+});
 const color = computed(() => (task.value ? noteColor(task.value.status, owner.value) : "var(--rs-paper)"));
 
 function onPhoto(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
-  if (file && task.value) nav.go({ name: "photo", taskId: task.value.id, file });
+  now.value = Date.now();
+  if (file && task.value && submissionState.value === "open") nav.go({ name: "photo", taskId: task.value.id, file });
 }
 </script>
 
@@ -47,28 +57,30 @@ function onPhoto(event: Event) {
       <dl class="facts">
         <dt class="rs-heading">Task:</dt>
         <dd class="rs-hand"><h1 class="task-title">{{ task.title }}</h1></dd>
+        <template v-if="task.flexibleDays">
+          <dt class="rs-heading">Opens</dt>
+          <dd class="rs-hand">{{ formatDateTime(task.start) }}</dd>
+        </template>
         <dt class="rs-heading">Due:</dt>
         <dd class="rs-hand">{{ formatDateTime(task.due) }}</dd>
         <dt class="rs-heading">Status:</dt>
         <dd class="rs-hand">{{ statusText(task.status, owner) }}</dd>
         <dt class="rs-heading nowrap">Assigned to:</dt>
-        <dd class="rs-hand">{{ mine ? `${owner?.name} (you)` : owner?.name }}</dd>
+        <dd class="rs-hand">{{ mine ? `${owner?.name} (you)` : owner?.name ?? 'Unassigned' }}</dd>
       </dl>
 
-      <template v-if="open">
+      <template v-if="open && mine">
+        <p v-if="submissionState === 'upcoming'" class="rs-body-text">Submissions open {{ formatDateTime(task.start) }}.</p>
+        <p v-else-if="submissionState === 'closed'" class="rs-body-text">The submission window has closed.</p>
         <!-- Camera only: `capture` opens the rear camera on phones. Desktop browsers ignore it and show a
              file picker. TODO: decide whether desktop should get getUserMedia capture instead. -->
-        <template v-if="mine">
+        <template v-else>
           <button type="button" class="rs-pill rs-pill--big rs-heading" @click="camera?.click()">
             Take Photo
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
           </button>
-          <input ref="camera" type="file" accept="image/*" capture="environment" hidden @change="onPhoto" />
+          <input ref="camera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden @change="onPhoto" />
         </template>
-        <button v-else type="button" class="rs-pill rs-pill--big rs-heading" @click="nav.go({ name: 'swap', taskId: task.id })">
-          Swap Task
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3" /></svg>
-        </button>
       </template>
 
       <section>
@@ -79,7 +91,7 @@ function onPhoto(event: Event) {
         <h2 class="rs-heading sub">Criteria:</h2>
         <p class="rs-body-text">{{ task.criteria }}</p>
       </section>
-      <section>
+      <section v-if="task.references.length">
         <h2 class="rs-heading sub">Reference Images:</h2>
         <div class="thumbs">
           <button

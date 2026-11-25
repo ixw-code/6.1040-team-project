@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createGateway } from "@mit-sdg/sync-engine/boundary";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { assembleApplication } from "../../src/assembly.ts";
-import { policy } from "../../src/http.ts";
+import { policy, sessionCookieName } from "../../src/http.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";
 
 const password = "correct dog";
@@ -49,6 +49,18 @@ describe("Users sign-in", () => {
     expect((await post("register", { username: "ben", password: otherPassword })).status).toBe(409);
     expect((await post("login", { username: "ben", password })).status).toBe(200);
     expect((await post("login", { username: "ben", password: otherPassword })).status).toBe(401);
+  });
+
+  test("concurrent registrations for the same username create one account with the winning credentials", async () => {
+    const post = requests(assembleApplication(database));
+    const username = "simultaneous";
+    const credentials = [password, otherPassword];
+    const results = await Promise.all(credentials.map(password => post("register", { username, password })));
+    expect(results.map(result => result.status).sort()).toEqual([200, 409]);
+    const winner = results.findIndex(result => result.status === 200);
+    expect(await post("me", {}, results[winner].cookie)).toMatchObject({ status: 200, body: { username } });
+    expect((await post("login", { username, password: credentials[winner] })).status).toBe(200);
+    expect((await post("login", { username, password: credentials[1 - winner] })).status).toBe(401);
   });
 
   test("refuses an invalid password before registering the username", async () => {
@@ -98,6 +110,6 @@ describe("Users sign-in", () => {
   test("refuses an unknown session", async () => {
     const post = requests(assembleApplication(database));
 
-    expect(await post("me", {}, "session=not-a-real-session")).toMatchObject({ status: 401 });
+    expect(await post("me", {}, `${sessionCookieName}=not-a-real-session`)).toMatchObject({ status: 401 });
   });
 });

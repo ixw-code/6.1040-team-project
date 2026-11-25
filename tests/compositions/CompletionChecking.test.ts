@@ -5,8 +5,8 @@ import { describe, expect, test } from "bun:test";
 import { assembleApplication } from "../../src/assembly.ts";
 import {
   createCompletionHandler,
+  createCompletionHooks,
   type CompletionHooks,
-  type CompletionTask,
   type TaskCompletion,
 } from "../../src/adapters/completionHttp.ts";
 import { createPhotoHandler, createPhotoStore } from "../../src/adapters/photos.ts";
@@ -14,59 +14,69 @@ import { accountRequests } from "../helpers/accounts.ts";
 import { useMongoTestDb } from "../helpers/mongo.ts";
 
 const url = "http://127.0.0.1";
-const sinkTask = "demo-sink";
-const otherTask = "demo-other-sink";
-const household = "demo-house";
-const otherHousehold = "demo-other-house";
 const notFound = { status: 404, body: { error: "NOT_FOUND" } };
+const conflict = { status: 409, body: { error: "CONFLICT" } };
 const png = Uint8Array.from(Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l2QAAAAASUVORK5CYII=", "base64",
 ));
 
-function completionFixtures(users: { alice: string; sam: string; reviewer: string; otherReviewer: string }) {
-  const roles = new Map<string, "RESIDENT" | "OVERSEER">([
-    [`${household}/${users.alice}`, "RESIDENT"],
-    [`${household}/${users.sam}`, "RESIDENT"],
-    [`${household}/${users.reviewer}`, "OVERSEER"],
-    [`${otherHousehold}/${users.sam}`, "RESIDENT"],
-    [`${otherHousehold}/${users.otherReviewer}`, "OVERSEER"],
-  ]);
-  const sink: CompletionTask = {
-    task: sinkTask,
-    household,
-    assignee: users.alice,
-    title: "Clear the sink",
-    criteria: "The sink and dish rack are empty.",
-    photoInstructions: "Show the whole sink and dish rack.",
-    baseline: "demo-sink-baseline.jpg",
-    dueAt: new Date("2026-12-01T00:00:00Z"),
-    active: true,
-    completed: false,
-  };
-  const tasks = new Map([
-    [sinkTask, sink],
-    [otherTask, { ...sink, task: otherTask, household: otherHousehold, assignee: users.sam }],
-  ]);
+async function completionFixtures(
+  application: ReturnType<typeof assembleApplication>,
+  users: { alice: string; sam: string; reviewer: string; otherReviewer: string },
+) {
+  const { ChoreCataloguing, HouseholdManaging, TaskScheduling } = application.concepts;
+
+  async function createHousehold(overseer: string) {
+    const result = await HouseholdManaging.create({ name: "Chore house", overseer });
+    if ("error" in result) throw new Error(result.error);
+    return result.household;
+  }
+  const household = await createHousehold(users.reviewer);
+  const otherHousehold = await createHousehold(users.otherReviewer);
+  await HouseholdManaging.addResident({ household, person: users.alice });
+  await HouseholdManaging.addResident({ household, person: users.sam });
+  await HouseholdManaging.addResident({ household: otherHousehold, person: users.sam });
+
+  async function addTask(group: string, person: string, name: string, firstDay: string, lastDay = firstDay) {
+    const interval = {
+      start: new Date(`${firstDay}T00:00:00-05:00`),
+      end: new Date(`${lastDay}T23:59:00-05:00`),
+    };
+    const created = await ChoreCataloguing.create({
+      group, name, difficulty: 1, description: "Show the whole sink and dish rack.",
+      requirements: ["The sink and dish rack are empty."], references: ["demo-sink-baseline.jpg"],
+    });
+    if ("error" in created) throw new Error(created.error);
+    const added = await TaskScheduling.add({ group, item: created.chore, interval, weight: 1 });
+    if ("error" in added) throw new Error(added.error);
+    const { task } = added;
+    await TaskScheduling.editAvailability({ group, person, windows: [interval], adding: true });
+    await TaskScheduling.setSchedule({ group, entries: [{ task, assignee: person }] });
+    return task;
+  }
+
+  const sinkTask = await addTask(household, users.alice, "Clear the sink", "2026-12-01");
+  const nextSinkTask = await addTask(household, users.alice, "Clear the sink next week", "2026-12-08");
+  const weekendTask = await addTask(household, users.alice, "Clean the kitchen", "2026-12-04", "2026-12-06");
+  const otherTask = await addTask(otherHousehold, users.sam, "Clear the sink", "2026-12-01");
+
   const completions = new Map<string, TaskCompletion>();
+  const live = createCompletionHooks(application.concepts);
   const hooks: CompletionHooks = {
-    role: (house, person) => roles.get(`${house}/${person}`),
-    task: (id) => {
-      const task = tasks.get(id);
-      return task && { ...task, completed: completions.has(id) };
-    },
+    ...live,
     async recordCompletion(completion) {
-      const existing = completions.get(completion.task);
-      if (existing && existing.submission !== completion.submission) throw new Error("Task already completed.");
-      if (!existing) completions.set(completion.task, completion);
+      await live.recordCompletion(completion);
+      if (!completions.has(completion.task)) completions.set(completion.task, completion);
     },
   };
-  return { hooks, completions };
+  return { hooks, completions, sinkTask, nextSinkTask, weekendTask, otherTask, household, otherHousehold };
 }
 
-function requests(handler: ReturnType<typeof createCompletionHandler>) {
+function requests(handler: ReturnType<typeof createCompletionHandler>, submit = handler) {
   return {
     async post(path: string, input: object, cookie?: string) {
-      const response = await handler(new Request(`${url}/api/completion/${path}`, {
+      const handle = path === "submit" ? submit : handler;
+      const response = await handle(new Request(`${url}/api/completion/${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
         body: JSON.stringify(input),
@@ -85,7 +95,8 @@ describe("CompletionChecking HTTP", () => {
   const database = useMongoTestDb("completion");
 
   async function setup(label: string) {
-    const application = assembleApplication(database);
+    let now = new Date("2026-12-01T12:00:00-05:00");
+    const application = assembleApplication(database, () => now);
     const { session } = accountRequests(application);
     const [alice, reviewer, sam, otherReviewer] = await Promise.all([
       session("register", `${label}-alice`),
@@ -93,7 +104,7 @@ describe("CompletionChecking HTTP", () => {
       session("register", `${label}-sam`),
       session("register", `${label}-other-reviewer`),
     ]);
-    const { hooks, completions } = completionFixtures({
+    const fixtures = await completionFixtures(application, {
       alice: alice.user, reviewer: reviewer.user, sam: sam.user, otherReviewer: otherReviewer.user,
     });
     const photos = createPhotoStore(database());
@@ -107,12 +118,14 @@ describe("CompletionChecking HTTP", () => {
       return (await response.json() as { photo: string }).photo;
     }
 
-    const completion = (dependencies = hooks) => requests(createCompletionHandler(application.concepts, photos, dependencies));
-    return { application, hooks, completions, completion, upload, alice, reviewer, sam, otherReviewer };
+    const submit = createHttpHandler({ application, gateway: createGateway({ application }), policy });
+    const setTime = (iso: string) => { now = new Date(iso); };
+    const completion = (dependencies = fixtures.hooks) => requests(createCompletionHandler(application.concepts, photos, dependencies), submit);
+    return { ...fixtures, application, completion, upload, alice, reviewer, sam, otherReviewer, setTime };
   }
 
   test("attaches a resident's upload, permits its household Overseer to view it, and awards credit once", async () => {
-    const { completion, upload, application, completions, alice, reviewer, sam, otherReviewer } = await setup("review");
+    const { completion, upload, application, completions, alice, reviewer, sam, otherReviewer, household, sinkTask } = await setup("review");
     const { post, readPhoto } = completion();
     const score = () => application.concepts.Ranking._score({ group: household, person: alice.user });
     const task = sinkTask;
@@ -188,7 +201,7 @@ describe("CompletionChecking HTTP", () => {
   });
 
   test("takes the session from the cookie and conceals tasks and queues from other users", async () => {
-    const { completion, alice, reviewer, sam, otherReviewer } = await setup("access");
+    const { completion, alice, reviewer, sam, otherReviewer, household, sinkTask } = await setup("access");
     const { post } = completion();
     const task = sinkTask;
     expect(await post("get", { task, session: alice.cookie })).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
@@ -203,8 +216,44 @@ describe("CompletionChecking HTTP", () => {
     expect(await post("review", { submission: "unknown", decision: "APPROVE" }, reviewer.cookie)).toEqual(notFound);
   });
 
+  test("checks each occurrence's window for new evidence and permits review after it closes", async () => {
+    const { application, completion, upload, alice, reviewer, setTime, sinkTask, nextSinkTask, weekendTask } = await setup("windows");
+    const { post } = completion();
+    const photo = await upload(alice.cookie);
+    const submit = (task: string) => post("submit", { task, photo }, alice.cookie);
+    const submitDirect = (task: string) => application.invoker.invoke("/completion/submit", {
+      session: alice.cookie.split("=")[1], task, photo,
+    }, { timeoutMs: 2000 });
+
+    setTime("2026-11-30T23:59:59.999-05:00");
+    expect(await submitDirect(sinkTask)).toMatchObject({ ok: false, error: { kind: "domain", value: "SUBMISSION_NOT_OPEN" } });
+    expect(await submit(sinkTask)).toEqual(conflict);
+    setTime("2026-12-01T00:00:00-05:00");
+    expect(await submit(sinkTask)).toMatchObject({ status: 200 });
+    expect(await submit(nextSinkTask)).toEqual(conflict);
+
+    setTime("2026-12-03T23:59:59.999-05:00");
+    expect(await submit(weekendTask)).toEqual(conflict);
+    setTime("2026-12-06T23:59:00-05:00");
+    const weekend = await submit(weekendTask);
+    expect(weekend).toMatchObject({ status: 200 });
+    expect(await post("get", { task: weekendTask }, alice.cookie)).toMatchObject({
+      body: { completion: { current: [{ submittedAt: "2026-12-07T04:59:00.000Z" }] } },
+    });
+    setTime("2026-12-06T23:59:00.001-05:00");
+    expect(await post("review", {
+      submission: weekend.body.submission, decision: "REJECT", feedback: "Include the counter.",
+    }, reviewer.cookie)).toMatchObject({ status: 200 });
+    expect(await submitDirect(weekendTask)).toMatchObject({ ok: false, error: { kind: "domain", value: "SUBMISSION_CLOSED" } });
+    expect(await submit(weekendTask)).toEqual(conflict);
+
+    setTime("2026-12-08T12:00:00-05:00");
+    expect(await submit(sinkTask)).toEqual(conflict);
+    expect(await submit(nextSinkTask)).toMatchObject({ status: 200 });
+  });
+
   test("retries an approval after completion recording fails and credits only after it succeeds", async () => {
-    const { hooks, completion, upload, sam, reviewer, otherReviewer, application } = await setup("retry");
+    const { hooks, completion, upload, sam, reviewer, otherReviewer, application, otherTask, otherHousehold } = await setup("retry");
     let firstWrite = true;
     const { post } = completion({
       ...hooks,
@@ -243,8 +292,8 @@ describe("CompletionChecking HTTP", () => {
     const application = assembleApplication(database);
     const { cookie } = await accountRequests(application).session("register", "completion-awaiting-hooks");
     const { post } = requests(createCompletionHandler(application.concepts, createPhotoStore(database())));
-    expect(await post("get", { task: sinkTask })).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
-    expect(await post("get", { task: sinkTask }, cookie)).toEqual({ status: 503, body: { error: "UNAVAILABLE" } });
+    expect(await post("get", { task: "task" })).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
+    expect(await post("get", { task: "task" }, cookie)).toEqual({ status: 503, body: { error: "UNAVAILABLE" } });
   });
 });
 
@@ -252,7 +301,6 @@ describe("Production completion", () => {
   const database = useMongoTestDb("completion_live");
 
   test("records an approved upload against the scheduled task and credits it once", async () => {
-    const { createCompletionHooks } = await import("../../src/adapters/completionHttp.ts");
     const application = assembleApplication(database);
     const { ChoreCataloguing, TaskScheduling, Ranking, Sessioning } = application.concepts;
     const { session, accountRequest } = accountRequests(application);

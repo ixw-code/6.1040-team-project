@@ -1,38 +1,45 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, watch, ref } from "vue";
 import ScopeToggle from "../components/ScopeToggle.vue";
 import StickyNote from "../components/StickyNote.vue";
 import WeekGrid from "../components/WeekGrid.vue";
-import { noteColor, startOfDay, statusText, tilt, timeRange } from "../display.ts";
+import { formatDate, noteColor, statusText, tilt, timeRange } from "../display.ts";
 import { useNav } from "../nav.ts";
-import { getPeople, getSchedule } from "../residentApi.ts";
+import { useResidentApi } from "../residentApi.ts";
+import { localDate } from "../../household.ts";
 import type { Person, Task } from "../types.ts";
 
 const nav = useNav();
+const { getPeople, getSchedule } = useResidentApi();
 const onlyMe = ref(false);
 const tasks = ref<Task[]>([]);
 const people = ref<Person[]>([]);
 const loading = ref(true);
 
-const from = startOfDay(new Date());
-const failed = ref(false);
-
-onMounted(async () => {
-  const until = new Date(from); until.setDate(until.getDate() + 7);
-  try {
-    [tasks.value, people.value] = await Promise.all([getSchedule(from, until), getPeople()]);
-  } catch {
-    failed.value = true;
-  } finally {
-    loading.value = false;
+const day = ref(localDate(new Date()));
+const from = computed(() => new Date(day.value + "T00:00"));
+watch(day, async (_, __, onCleanup) => {
+  let current = true;
+  onCleanup(() => { current = false; });
+  if (!day.value) return;
+  loading.value = true;
+  const until = new Date(from.value);
+  until.setDate(until.getDate() + 7);
+  const list = await getSchedule(from.value, until);
+  if (current) {
+    tasks.value = list; people.value = getPeople(); loading.value = false;
   }
-});
+}, { immediate: true });
 
 const byId = computed(() => new Map(people.value.map((p) => [p.id, p])));
 const others = computed(() => people.value.filter((p) => !p.isMe));
 const shown = computed(() => tasks.value
   .filter((t) => !onlyMe.value || byId.value.get(t.ownerId)?.isMe)
-  .map((t) => ({ ...t, end: t.due })));
+  .map((task) => {
+    const end = task.end ?? task.due;
+    const time = task.flexibleDays ? `${formatDate(task.start)} – ${formatDate(end)}` : timeRange(task.start, end);
+    return { ...task, end, time };
+  }));
 </script>
 
 <template>
@@ -42,26 +49,26 @@ const shown = computed(() => tasks.value
       <ScopeToggle v-model="onlyMe" what="tasks" />
     </header>
 
+    <label>Starting date <input v-model="day" type="date" required></label>
     <ul v-if="!onlyMe" class="legend" aria-label="Who's who">
       <li v-for="p in others" :key="p.id"><span class="swatch" :style="{ background: p.color }" />{{ p.name }}</li>
     </ul>
 
-    <p v-if="failed" class="rs-status-line rs-hand rs-error">Couldn't load the calendar. Try again.</p>
-    <p v-else-if="loading" class="rs-status-line rs-hand">Loading…</p>
-    <WeekGrid v-else :items="shown" :from="from">
+    <p v-if="loading" class="rs-status-line rs-hand">Loading…</p>
+    <WeekGrid v-else-if="day" :items="shown" :from="from" :start-hour="0">
       <template #item="{ item }">
         <StickyNote
           clickable
           :pin="false"
           :color="noteColor(item.status, byId.get(item.ownerId))"
           :tilt="tilt(item.id)"
-          :label="`${item.title}, ${byId.get(item.ownerId)?.isMe ? 'you' : byId.get(item.ownerId)?.name}, ${timeRange(item.start, item.due)}, ${statusText(item.status, byId.get(item.ownerId))}`"
+          :label="`${item.title}, ${byId.get(item.ownerId)?.isMe ? 'you' : byId.get(item.ownerId)?.name ?? 'Unassigned'}, ${item.time}, ${statusText(item.status, byId.get(item.ownerId))}`"
           class="cal-note"
           @open="nav.go({ name: 'task', taskId: item.id })"
         >
           <span>{{ item.title }}</span>
-          <span>{{ timeRange(item.start, item.due) }}</span>
-          <span>{{ byId.get(item.ownerId)?.isMe ? "Me" : byId.get(item.ownerId)?.name }}</span>
+          <span>{{ item.time }}</span>
+          <span>{{ byId.get(item.ownerId)?.isMe ? "Me" : byId.get(item.ownerId)?.name ?? 'Unassigned' }}</span>
           <span>{{ statusText(item.status, byId.get(item.ownerId)) }}</span>
         </StickyNote>
       </template>
