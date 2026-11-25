@@ -1,5 +1,11 @@
 import { useSession } from "./session.ts";
 
+export class CompletionRequestError extends Error {
+  constructor(readonly status: number, code: string) {
+    super(code);
+  }
+}
+
 export async function completionRequest<T>(path: string, body: object | File): Promise<T> {
   const file = body instanceof File;
   const response = await fetch("/api" + path, {
@@ -10,11 +16,19 @@ export async function completionRequest<T>(path: string, body: object | File): P
   if (response.status === 401) useSession().sessionEnded();
   if (!response.ok) {
     const refusal = await response.json().catch(() => ({}));
-    throw new Error(refusal.error ?? "Request failed (" + response.status + ")");
+    throw new CompletionRequestError(response.status, refusal.error ?? "Request failed (" + response.status + ")");
   }
   return response.json();
 }
 
 export function submissionImage(submission: string) {
   return "/api/completion/submissions/" + encodeURIComponent(submission) + "/photo";
+}
+
+export function submissionBaselineImage(submission: string) {
+  return "/api/completion/submissions/" + encodeURIComponent(submission) + "/baseline";
+}
+
+export function taskBaselineImage(task: string) {
+  return "/api/completion/tasks/" + encodeURIComponent(task) + "/baseline";
 }
