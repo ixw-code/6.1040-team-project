@@ -50,6 +50,10 @@ export function createPhotoStore(db: Db) {
     read(photo: string, owner: string) {
       return photos.findOne({ _id: photo, owner });
     },
+    // Use only with a baseline reference from a task or submission the caller is allowed to read.
+    readReference(photo: string) {
+      return photos.findOne({ _id: photo });
+    },
   };
 }
 

@@ -1,14 +1,15 @@
 // In-app navigation for the resident screens: a stack of screens under the current tab.
 // Kept dependency-free on purpose (no vue-router) so it drops into App.vue without touching main.ts.
 import { computed, ref } from "vue";
+import type { TaskDetail } from "./types.ts";
 
 export type Tab = "tasks" | "calendar" | "availability" | "prefs" | "swaps";
 export const TABS: Tab[] = ["tasks", "calendar", "availability", "prefs", "swaps"];
 
 export type Screen =
   | { name: Tab }
-  | { name: "task"; taskId: string }
-  | { name: "photo"; taskId: string; file: File }
+  | { name: "task"; taskId: string; calendarPreview?: TaskDetail }
+  | { name: "photo"; taskId: string; file: File; baseline: string | null; criteria: string }
   | { name: "attempt"; taskId: string; attemptId: string }
   | { name: "image"; url: string | null; label: string }
   | { name: "availabilityForm" }

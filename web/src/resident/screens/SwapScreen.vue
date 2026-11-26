@@ -5,7 +5,7 @@ import BackLink from "../components/BackLink.vue";
 import SwapPair from "../components/SwapPair.vue";
 import { formatDateTime, isOpen } from "../display.ts";
 import { useNav } from "../nav.ts";
-import { getMyTasks, getPeople, getTask, requestSwap } from "../residentApi.ts";
+import { getMyTasks, getPeople, getSwapTask, requestSwap } from "../residentApi.ts";
 import type { Person, Task } from "../types.ts";
 
 const props = defineProps<{ taskId: string }>();
@@ -17,7 +17,7 @@ const pickedId = ref("");
 const state = ref<"idle" | "sending" | "sent" | "error">("idle");
 
 onMounted(async () => {
-  const [task, mine, folks] = await Promise.all([getTask(props.taskId), getMyTasks(), getPeople()]);
+  const [task, mine, folks] = await Promise.all([getSwapTask(props.taskId), getMyTasks(), getPeople()]);
   theirs.value = task;
   people.value = folks;
   mineOpen.value = mine.filter((t) => isOpen(t.status)).sort((a, b) => a.due.localeCompare(b.due));

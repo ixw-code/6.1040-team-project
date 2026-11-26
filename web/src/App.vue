@@ -4,7 +4,7 @@ import PhotoBox from "./resident/components/PhotoBox.vue";
 import ResidentApp from "./resident/ResidentApp.vue";
 import { statusOf, type Attempt, type Chore, type Decision, type Photo, type ReviewStatus } from "./review-preview.ts";
 import { api } from "./api.ts";
-import { completionRequest, submissionImage } from "./completion-api.ts";
+import { completionRequest, submissionBaselineImage, submissionImage } from "./completion-api.ts";
 import PasswordForm from "./PasswordForm.vue";
 import SignIn from "./SignIn.vue";
 import { useSession } from "./session.ts";
@@ -21,14 +21,14 @@ const noteError = ref("");
 const noteField = ref<HTMLTextAreaElement>();
 const announcement = ref("");
 const homes = ref<{ household: string; name: string }[]>([]);
-const choresById = ref<Record<string, Chore & { active: boolean; completed: boolean }>>({});
+const choresById = ref<Record<string, Pick<Chore, "title" | "resident" | "initials" | "criteria">>>({});
 const busy = ref(false);
 const saving = ref(false);
 const householdName = ref("");
 const memberId = ref("");
 const problem = ref("");
 type Completion = { completion: {
-  task: { task: string; title: string; assignee: string; criteria: string; photoInstructions: string; baseline: string; active: boolean; completed: boolean };
+  task: { task: string; title: string; assignee: string; criteria: string };
   history: { submission: string; submittedAt: string; reviewedAt: string | null; status: string; feedback: string }[];
 } };
 
@@ -50,8 +50,7 @@ async function refresh() {
     ));
     const photo = (url: string, alt: string): Photo => ({ url, alt });
     choresById.value = Object.fromEntries(tasks.map(({ task }) => [task.task, {
-      id: task.task, title: task.title, resident: task.assignee, initials: "", active: task.active, completed: task.completed,
-      criteria: task.criteria, photoInstructions: task.photoInstructions, baseline: photo(task.baseline, "Baseline photo"),
+      title: task.title, resident: task.assignee, initials: "", criteria: task.criteria,
     }]));
     attempts.value = tasks.flatMap(({ task, history }) => history.toReversed().map((row): Attempt => ({
       id: row.submission, taskId: task.task, submittedAt: new Date(row.submittedAt),
@@ -286,7 +285,7 @@ async function saveReview(decision: Decision) {
             </figure>
             <figure>
               <figcaption>Baseline photo</figcaption>
-              <PhotoBox :url="'url' in chore.baseline ? chore.baseline.url : null" :label="chore.baseline.alt" />
+              <PhotoBox :url="submissionBaselineImage(selected.id)" label="Baseline photo" text="Baseline photo unavailable" />
             </figure>
           </div>
 

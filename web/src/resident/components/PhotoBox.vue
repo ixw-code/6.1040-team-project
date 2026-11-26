@@ -1,10 +1,13 @@
 <script setup lang="ts">
-// Displays a stored or locally previewed photo, or a placeholder when no photo is available.
-defineProps<{ url: string | null; label: string; text?: string }>();
+import { ref, watch } from "vue";
+
+const props = defineProps<{ url: string | null; label: string; text?: string }>();
+const failed = ref(false);
+watch(() => props.url, () => { failed.value = false; });
 </script>
 
 <template>
-  <img v-if="url" :src="url" :alt="label" class="photo" />
+  <img v-if="url && !failed" :src="url" :alt="label" class="photo" @error="failed = true" />
   <span v-else class="photo rs-placeholder rs-serif" role="img" :aria-label="label">{{ text ?? label }}</span>
 </template>
 

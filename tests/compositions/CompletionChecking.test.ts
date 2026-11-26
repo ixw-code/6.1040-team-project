@@ -22,6 +22,9 @@ const notFound = { status: 404, body: { error: "NOT_FOUND" } };
 const png = Uint8Array.from(Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l2QAAAAASUVORK5CYII=", "base64",
 ));
+const baselinePng = Uint8Array.from(Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP438AAAAQBAYDFKhhdAAAAAElFTkSuQmCC", "base64",
+));
 
 function completionFixtures(users: { alice: string; sam: string; reviewer: string; otherReviewer: string }) {
   const roles = new Map<string, "RESIDENT" | "OVERSEER">([
@@ -64,7 +67,14 @@ function completionFixtures(users: { alice: string; sam: string; reviewer: strin
 }
 
 function requests(handler: ReturnType<typeof createCompletionHandler>) {
+  function get(path: string, cookie?: string) {
+    return handler(new Request(`${url}/api/completion/${path}`, {
+      headers: cookie ? { Cookie: cookie } : {},
+    }));
+  }
+
   return {
+    get,
     async post(path: string, input: object, cookie?: string) {
       const response = await handler(new Request(`${url}/api/completion/${path}`, {
         method: "POST",
@@ -74,9 +84,7 @@ function requests(handler: ReturnType<typeof createCompletionHandler>) {
       return { status: response.status, body: await response.json() };
     },
     readPhoto(submission: string, cookie: string) {
-      return handler(new Request(`${url}/api/completion/submissions/${submission}/photo`, {
-        headers: { Cookie: cookie },
-      }));
+      return get(`submissions/${submission}/photo`, cookie);
     },
   };
 }
@@ -267,17 +275,26 @@ describe("Production completion", () => {
     }
     const owner = await session("register", "live-owner");
     const resident = await session("register", "live-resident");
+    const neighbor = await session("register", "live-neighbor");
     const login = await session("login", "live-owner");
     expect((await accountRequest("me", {}, login.cookie)).status).toBe(200);
     const { household } = await call("/households/create", { name: "Home" }, owner.cookie);
     await call("/households/residents/add", { household, person: resident.user }, owner.cookie);
+    await call("/households/residents/add", { household, person: neighbor.user }, owner.cookie);
     const { category } = await call("/households/categories/add", { household, name: "Kitchen" }, owner.cookie);
     await call("/households/preferences/set", {
       household, person: resident.user, category, preferenceLevel: "PREFER",
     }, resident.cookie);
+    const photos = createPhotoStore(database());
+    const photoHandler = createPhotoHandler(photos, Sessioning);
+    const baselineUpload = await photoHandler(new Request(url + "/api/photos", {
+      method: "POST", headers: { Cookie: owner.cookie, "Content-Type": "image/png" }, body: baselinePng,
+    }));
+    expect(baselineUpload.status).toBe(201);
+    const { photo: baseline } = await baselineUpload.json();
     const createdChore = await ChoreCataloguing.create({
       group: household, category, name: "Sink", difficulty: 2, description: "Show the sink",
-      requirements: ["Empty the sink"], references: [],
+      requirements: ["Empty the sink"], references: [baseline],
     });
     if ("error" in createdChore) throw new Error(createdChore.error);
     const { chore } = createdChore;
@@ -289,26 +306,43 @@ describe("Production completion", () => {
       household, from: start, until: end, onlyUnassigned: true,
     }, owner.cookie);
     expect(scheduling.scheduled).toEqual([{ task, person: resident.user }]);
-    const photos = createPhotoStore(database());
-    const upload = await createPhotoHandler(photos, Sessioning)(new Request(url + "/api/photos", {
+    const upload = await photoHandler(new Request(url + "/api/photos", {
       method: "POST", headers: { Cookie: resident.cookie, "Content-Type": "image/png" }, body: png,
     }));
     expect(upload.status).toBe(201);
     const { photo } = await upload.json();
-    const { post } = requests(createCompletionHandler(application.concepts, photos, createCompletionHooks(application.concepts)));
+    const { get, post } = requests(createCompletionHandler(application.concepts, photos, createCompletionHooks(application.concepts)));
+    const taskBaseline = `tasks/${task}/baseline`;
+    expect((await get(taskBaseline)).status).toBe(401);
+    expect((await get(taskBaseline, neighbor.cookie)).status).toBe(404);
+    const reference = await get(taskBaseline, resident.cookie);
+    expect(reference.status).toBe(200);
+    expect(reference.headers.get("content-type")).toBe("image/png");
+    expect(reference.headers.get("cache-control")).toBe("private, no-store");
+    expect(new Uint8Array(await reference.arrayBuffer())).toEqual(baselinePng);
+    expect((await photoHandler(new Request(`${url}/api/photos/${baseline}`, {
+      headers: { Cookie: resident.cookie },
+    }))).status).toBe(404);
     const token = resident.cookie.split("=")[1];
     expect(await application.invoker.invoke("/completion/submit", {
       session: token, task, photo: "missing-upload",
     }, { timeoutMs: 2000 })).toMatchObject({ ok: false, error: { kind: "domain", value: "NOT_FOUND" } });
-    const foreignUpload = await createPhotoHandler(photos, Sessioning)(new Request(url + "/api/photos", {
-      method: "POST", headers: { Cookie: owner.cookie, "Content-Type": "image/png" }, body: png,
-    }));
-    expect(foreignUpload.status).toBe(201);
-    const foreign = await foreignUpload.json();
     expect(await application.invoker.invoke("/completion/submit", {
-      session: token, task, photo: foreign.photo,
+      session: token, task, photo: baseline,
     }, { timeoutMs: 2000 })).toMatchObject({ ok: false, error: { kind: "domain", value: "NOT_FOUND" } });
     const result = await call("/completion/submit", { task, photo }, resident.cookie);
+    expect(await ChoreCataloguing.updateReferencePhotos({
+      chore, group: household, references: [],
+    })).toEqual({ chore });
+    expect((await get(taskBaseline, resident.cookie)).status).toBe(404);
+
+    const attemptBaseline = `submissions/${result.submission}/baseline`;
+    expect((await get(attemptBaseline, neighbor.cookie)).status).toBe(404);
+    for (const cookie of [owner.cookie, resident.cookie]) {
+      const image = await get(attemptBaseline, cookie);
+      expect(image.status).toBe(200);
+      expect(new Uint8Array(await image.arrayBuffer())).toEqual(baselinePng);
+    }
     const review = { submission: result.submission, decision: "APPROVE" };
     expect(await post("review", review, resident.cookie)).toEqual(notFound);
     expect((await post("review", review, owner.cookie)).status).toBe(200);

@@ -5,12 +5,22 @@ import PhotoBox from "../components/PhotoBox.vue";
 import { ATTEMPT_COLOR, ATTEMPT_LABEL, formatDateTime } from "../display.ts";
 import { useNav } from "../nav.ts";
 import { getTask } from "../residentApi.ts";
-import type { Task } from "../types.ts";
+import type { TaskDetail } from "../types.ts";
 
 const props = defineProps<{ taskId: string; attemptId: string }>();
 const nav = useNav();
-const task = ref<Task | null>(null);
-onMounted(async () => { task.value = await getTask(props.taskId); });
+const task = ref<TaskDetail | null>(null);
+const loading = ref(true);
+const failed = ref(false);
+onMounted(async () => {
+  try {
+    task.value = await getTask(props.taskId);
+  } catch {
+    failed.value = true;
+  } finally {
+    loading.value = false;
+  }
+});
 const attempt = computed(() => task.value?.attempts.find((a) => a.id === props.attemptId));
 </script>
 
@@ -18,7 +28,9 @@ const attempt = computed(() => task.value?.attempts.find((a) => a.id === props.a
   <section class="page" :style="{ background: attempt ? ATTEMPT_COLOR[attempt.status] : undefined }">
     <div class="rs-screen">
       <BackLink :label="task?.title ?? 'Task'" />
-      <p v-if="!attempt" class="rs-status-line rs-hand">Loading…</p>
+      <p v-if="loading" class="rs-status-line rs-hand">Loading…</p>
+      <p v-else-if="failed" role="alert" class="rs-status-line rs-hand rs-error">Couldn't load this submission. Try again.</p>
+      <p v-else-if="!attempt" class="rs-status-line rs-hand rs-error">This submission is no longer available.</p>
       <template v-else>
         <dl class="facts">
           <dt class="rs-heading">Status:</dt>

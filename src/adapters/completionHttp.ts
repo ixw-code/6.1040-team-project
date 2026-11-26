@@ -78,7 +78,8 @@ export function createCompletionHooks({
 
 const prefix = "/api/completion/";
 const paths = new Set(["submit", "get", "review", "review-queue"].map((name) => prefix + name));
-const submissionPhotoPath = /^\/api\/completion\/submissions\/([\da-f-]{36})\/photo$/;
+const submissionPhotoPath = /^\/api\/completion\/submissions\/([\da-f-]{36})\/(photo|baseline)$/;
+const taskBaselinePath = /^\/api\/completion\/tasks\/([\w-]{1,256})\/baseline$/;
 const errorCodes = {
   400: "INVALID_REQUEST",
   401: "UNAUTHORIZED",
@@ -190,22 +191,39 @@ export function createCompletionHandler(
 
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
-    const attachment = submissionPhotoPath.exec(path)?.[1];
-    if (!attachment && !paths.has(path)) return failure(404);
+    const attachment = submissionPhotoPath.exec(path);
+    const baselineTask = taskBaselinePath.exec(path)?.[1];
+    if (!attachment && !baselineTask && !paths.has(path)) return failure(404);
     if (!allowsAppOrigin(request)) return failure(403);
-    if (request.method !== (attachment ? "GET" : "POST")) return failure(400);
+    if (request.method !== (attachment || baselineTask ? "GET" : "POST")) return failure(400);
 
     try {
       const person = await signedInPerson(request, Sessioning);
       if (!person) return failure(401);
       if (!hooks) return failure(503);
 
+      if (baselineTask) {
+        const task = await hooks.task(baselineTask);
+        if (!task?.baseline) return failure(404);
+        const role = await hooks.role(task.household, person);
+        if (role !== "OVERSEER" && (role !== "RESIDENT" || task.assignee !== person)) return failure(404);
+
+        const stored = await photos.readReference(task.baseline);
+        return stored ? photoResponse(stored) : failure(404);
+      }
+
       if (attachment) {
-        const [details] = await PhotoChecking._submission({ submission: attachment });
+        const [, submission, kind] = attachment;
+        const [details] = await PhotoChecking._submission({ submission });
         const task = details && await hooks.task(details.subject);
         if (!task) return failure(404);
         const role = await hooks.role(task.household, person);
         if (role !== "OVERSEER" && (role !== "RESIDENT" || details.person !== person)) return failure(404);
+        if (kind === "baseline") {
+          const stored = details.baseline && await photos.readReference(details.baseline);
+          return stored ? photoResponse(stored) : failure(404);
+        }
+
         // Resolve the file from the authorized submission, including the original uploader.
         const stored = await photos.read(details.photo, details.person);
         return stored ? photoResponse(stored) : failure(404);
