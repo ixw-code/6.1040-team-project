@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // Entry point for the resident side. App.vue renders this when the role switch is on "Resident view".
 import "./resident.css";
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import TabBar from "./components/TabBar.vue";
 import { useNav } from "./nav.ts";
 import AttemptScreen from "./screens/AttemptScreen.vue";
 import AvailabilityFormScreen from "./screens/AvailabilityFormScreen.vue";
 import AvailabilityScreen from "./screens/AvailabilityScreen.vue";
 import CalendarScreen from "./screens/CalendarScreen.vue";
+import HouseholdSetupScreen from "./screens/HouseholdSetupScreen.vue";
 import ImageViewerScreen from "./screens/ImageViewerScreen.vue";
 import MyTasksScreen from "./screens/MyTasksScreen.vue";
 import PhotoPreviewScreen from "./screens/PhotoPreviewScreen.vue";
@@ -16,8 +17,18 @@ import SwapScreen from "./screens/SwapScreen.vue";
 import SwapsScreen from "./screens/SwapsScreen.vue";
 import TaskDetailScreen from "./screens/TaskDetailScreen.vue";
 import { useSession } from "../session.ts";
+import { api } from "../api.ts";
 
 const { household } = useSession();
+
+// Wait for the household list before deciding to show the Welcome screen, so it doesn't flash.
+const loaded = ref(!!household.value);
+onMounted(async () => {
+  if (loaded.value) return;
+  const result = await api.households.mine();
+  if (!("error" in result) && !household.value) household.value = result.households[0]?.household ?? "";
+  loaded.value = true;
+});
 
 const nav = useNav();
 const screen = computed(() => nav.current.value);
@@ -28,9 +39,10 @@ const screenKey = computed(() => `${nav.tab.value}:${JSON.stringify(screen.value
 <template>
   <div class="resident rs-cork">
     <div class="resident rs-cork">
-      <section v-if="!household" class="rs-screen">
-        <p class="rs-status-line rs-hand">You're not in a household yet.</p>
+      <section v-if="!loaded" class="rs-screen">
+        <p class="rs-status-line rs-hand">Loading…</p>
       </section>
+      <HouseholdSetupScreen v-else-if="!household" />
       <main v-else :key="screenKey" class="resident-main">
         <MyTasksScreen v-if="screen.name === 'tasks'" />
         <CalendarScreen v-else-if="screen.name === 'calendar'" />
