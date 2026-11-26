@@ -25,6 +25,7 @@ const choresById = ref<Record<string, Chore & { active: boolean; completed: bool
 const busy = ref(false);
 const saving = ref(false);
 const householdName = ref("");
+const memberId = ref("");
 const problem = ref("");
 type Completion = { completion: {
   task: { task: string; title: string; assignee: string; criteria: string; photoInstructions: string; baseline: string; active: boolean; completed: boolean };
@@ -99,6 +100,20 @@ async function createHousehold() {
   } finally {
     saving.value = false;
   }
+}
+
+async function addMember() {
+  saving.value = true;
+  problem.value = "";
+  const result = await api.households.residents.add({ household: household.value, person: memberId.value.trim() });
+  saving.value = false;
+  if ("error" in result) {
+    problem.value = result.error === "NOT_FOUND" ? "No account has that ID." : result.error === "CONFLICT"
+      ? "They're already in this household." : "Couldn't add them. Try again.";
+    return;
+  }
+  announcement.value = "Added them to the household.";
+  memberId.value = "";
 }
 
 watch([household, role], () => {
@@ -214,6 +229,10 @@ async function saveReview(decision: Decision) {
       <form @submit.prevent="createHousehold">
         <label>New household <input v-model="householdName" required /></label>
         <button type="submit" :disabled="busy || saving">Create household</button>
+      </form>
+      <form v-if="household" @submit.prevent="addMember">
+        <label>Add member by ID <input v-model="memberId" autocomplete="off" required /></label>
+        <button type="submit" :disabled="busy || saving">Add member</button>
       </form>
       <p v-if="problem" role="alert">{{ problem }}</p>
       <p v-if="busy" role="status">Loading…</p>
