@@ -5,10 +5,18 @@ import { STATUS_COLOR, STATUS_LABEL, formatDateTime, isOverdue, tilt } from "../
 import { useNav } from "../nav.ts";
 import { getMyTasks } from "../residentApi.ts";
 import type { Task } from "../types.ts";
+import { api } from "../../api.ts";
+import { useSession } from "../../session.ts";
 
 const nav = useNav();
 const tasks = ref<Task[] | null>(null);
 const failed = ref(false);
+const householdName = ref("Your household");
+
+onMounted(async () => {
+  const result = await api.households.get({ household: useSession().household.value });
+  if (!("error" in result)) householdName.value = result.household.name;
+});
 
 onMounted(async () => {
   try {
@@ -26,8 +34,7 @@ onMounted(async () => {
   <section class="rs-screen">
     <header>
       <h1 class="rs-title rs-heading">My Tasks</h1>
-      <!-- TODO(backend): household name from HouseholdManaging._householdsByPerson(me). -->
-      <p class="rs-body-text">Maple House · this week</p>
+      <p class="rs-body-text">{{ householdName }} · this week</p>
     </header>
 
     <p v-if="failed" class="rs-status-line rs-hand rs-error">Couldn't load your tasks. Try again.</p>
